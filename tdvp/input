@@ -1,0 +1,32 @@
+basic
+{
+    mu_leadL = -0.01
+    mu_device = 0
+    mu_leadR = 0.01
+
+    dt = 1
+    time_steps = 30
+    NumCenter = 1
+    ConserveQNs = no
+
+    SubCorrN = 150
+    corr_cutoff = 1e-4
+
+    input_dir = ../dmrg/tp0.5
+    psi_file = psi_m128.mps
+    H_file = H
+
+    write = no
+    write_dir = .
+    write_file = timeevol.save
+    read = no
+    read_dir = .
+    read_file = timeevol.save
+
+    WriteDim = 1000
+    sweeps
+    {
+        maxm   minm   cutoff   niter  noise    nsweep
+        200    16      1E-8     20     0        1
+    }
+}

@@ -1,0 +1,45 @@
+basic
+{
+    L_lead = 200
+    L_device = 1
+    t_lead = 1
+    t_device = 1
+    t_contactL = 1
+    t_contactR = 0.5
+    mu_lead = 0
+    mu_device = 0
+    V_device = 0
+    damp_decay_length = 50
+    ConserveQNs = no
+
+    local_mu
+    {
+        i    mu
+    }
+
+    local_tV
+    {
+        i   j   t   V
+    }
+
+    write_to_file = yes
+    outdir = tp0.5
+    out_minm = 0
+    out_Hamilt = H
+
+    verbose = yes
+    useSVD = yes
+    SVDMethod = gesdd
+
+    WriteDim = 2000
+    sweeps
+    {
+        maxm   cutoff   niter  noise    nsweep
+        16     1E-12    10     0        4
+        32     1E-12    10     0        4
+        64     1E-12    10     0        4
+        128    1E-12    10     0        4
+        200    1E-12    10     0        3
+        300    1E-12    10     0        3
+    }
+}
