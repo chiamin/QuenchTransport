@@ -78,20 +78,42 @@ MPO MPOGen :: makeMPO (const SiteSet& sites) const
 {
     MPO mpo (sites);
     int N = length (sites);
-    Index li (this->dim(), "Link");
+
+    Index li;
+    auto ii = sites(1);
+    if (nblock(ii) == 0)                // no quantum number
+    {
+        li = Index (this->dim(),"Link");
+    }
+    else if (qn(ii,1).hasName("Nf"))    // conserve particle number
+    {
+        li = Index (QN(),2,
+                    QN({"Nf",-1,-1}),1,
+                    QN({"Nf",1,-1}),1,
+                    In,"Link");
+    }
+    else if (qn(ii,1).hasName("Pf"))    // conserve parity
+    {
+        li = Index (QN(),2,
+                    QN({"Pf",1,-2}),2,
+                    In,"Link");
+    }
+    else throw;
+
     auto li0 = li;
     for(int i = 1; i <= N; i++)
     {
         // Make tensor
         Index ri = sim (li);
+        Index dri = dag(ri);
         Index si = sites(i);
         auto& W = mpo.ref(i);
-        W = ITensor (dag(si), prime(si), li, dag(ri));
+        W = ITensor (dag(si), prime(si), li, dri);
 
         // Initialize
         auto I = Identity (dag(si), prime(si));
-        W += I * setElt(li=_nbeg) * setElt(ri=_nbeg);
-        W += I * setElt(li=_nend) * setElt(ri=_nend);
+        W += I * setElt(li=_nbeg) * setElt(dri=_nbeg);
+        W += I * setElt(li=_nend) * setElt(dri=_nend);
 
         // Set operators
         auto const& ops = _Ws.at(i);
@@ -107,32 +129,32 @@ MPO MPOGen :: makeMPO (const SiteSet& sites) const
                     op1 *= prime(sites.op("F",i));
                     op1.mapPrime (2,1,"Site");
                 }
-                W += op1 * setElt(li=_nbeg) * setElt(ri=n);
+                W += op1 * setElt(li=_nbeg) * setElt(dri=n);
             }
             // End operator
             if (info.coef2 != 0.)
             {
                 auto op2 = info.coef2 * sites.op (info.op2, i);
-                W += op2 * setElt(li=n) * setElt(ri=_nend);
+                W += op2 * setElt(li=n) * setElt(dri=_nend);
             }
             // Long-range coefficient
             if (info.long_range_coef != 0.)
             {
                 auto op = (_fermion ? sites.op("F",i) : I);
                 auto D = info.long_range_coef * op;
-                W += D * setElt(li=n) * setElt(ri=n);
+                W += D * setElt(li=n) * setElt(dri=n);
             }
         }
         // Onsite operator
         if (_onsite_op.at(i))
         {
-            W += _onsite_op.at(i) * setElt(li=_nbeg) * setElt(ri=_nend);
+            W += _onsite_op.at(i) * setElt(li=_nbeg) * setElt(dri=_nend);
         }
 
         li = ri;
     }
     mpo.ref(1) *= setElt(dag(li0)=_nbeg);
-    mpo.ref(N) *= setElt(dag(li)=_nend);
+    mpo.ref(N) *= setElt(li=_nend);
     return mpo;
 }
 #endif

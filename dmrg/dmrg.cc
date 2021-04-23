@@ -1,3 +1,4 @@
+#include <iomanip>
 #include "itensor/all.h"
 #include "ReadInput.h"
 #include "IUtility.h"
@@ -5,9 +6,12 @@
 #include "MPSUtility.h"
 #include "SingleParticle.h"
 #include "MixedBasis.h"
+#include "SystemStruct.h"
+#include "ContainerUtility.h"
+using namespace vectool;
 using namespace itensor;
 using namespace std;
-using namespace myutility;
+using namespace iutility;
 
 template <typename SitesType>
 MPO current_correlation (const SitesType& sites, int i)
@@ -21,11 +25,21 @@ MPO current_correlation (const SitesType& sites, int i)
         ampo +=  1_i,"Cdag",N-i,"C",N-i+1;
         ampo += -1_i,"Cdag",N-i+1,"C",N-i;
     }
-
     return toMPO (ampo);
 }
 
-MPS make_initstate (const Fermion& sites, int Np)
+MPO Make_NMPO (const MixedBasis& sites)
+{
+    AutoMPO ampo (sites);
+    for(int i = 1; i <= length(sites); i++)
+    {
+        ampo += 1.0,"N",i;
+    }
+    return toMPO (ampo);
+}
+
+template <typename SiteType>
+MPS make_initstate (const SiteType& sites, int Np)
 {
     int N = length(sites);
     int Npar = Np;
@@ -55,16 +69,21 @@ MPS make_initstate (const Fermion& sites, int Np)
         cout << "particle number not match:" << Ntot << " " << Npar << endl;
         throw;
     }
-
     return psi;
 }
 
-/*inline ostream& operator<< (ostream& os, const Vector& v)
+template <typename T>
+bool ordered (const vector<T>& ns, T resolution=1e-4)
 {
-    for(size_t i=0; i < v.size(); i++)
-        os << v(i) << " ";
-    return os;
-}*/
+    for(int i = 1; i < ns.size(); i++)
+    {
+        T n1 = ns.at(i-1),
+          n2 = ns.at(i);
+        if (abs(n1-n2) > resolution and n2 > n1)
+            return false;
+    }
+    return true;
+}
 
 int main(int argc, char* argv[])
 {
@@ -79,7 +98,8 @@ int main(int argc, char* argv[])
     auto t_device   = input.getReal("t_device");
     auto t_contactL = input.getReal("t_contactL");
     auto t_contactR = input.getReal("t_contactR");
-    auto mu_lead    = input.getReal("mu_lead");
+    auto mu_leadL   = input.getReal("mu_leadL");
+    auto mu_leadR   = input.getReal("mu_leadR");
     auto mu_device  = input.getReal("mu_device");
     auto V_device   = input.getReal("V_device");
     auto damp_decay_length = input.getReal("damp_decay_length");
@@ -88,25 +108,30 @@ int main(int argc, char* argv[])
     auto out_dir    = input.getString("outdir",".");
     auto out_minm   = input.getInt("out_minm",0);
     auto out_Hamilt = input.getString("out_Hamilt","H");
-    auto ConserveQNs = input.getYesNo("ConserveQNs",false);
+    auto ConserveNf = input.getYesNo("ConserveNf",false);
     auto WriteDim   = input.getInt("WriteDim",-1);
     auto verbose    = input.getYesNo("verbose",false);
     auto sweeps     = Read_sweeps (infile);
 
+    auto reorderN   = input.getInt("reorderN",0);
+    auto cutoff_reorder = input.getReal("cutoff_reorder",1e-12);
+
     // Define basis
     Real damp_fac = exp(-1./damp_decay_length);
     cout << "H left lead" << endl;
-    auto H_leadL = Hamilt_k (L_lead, t_lead, mu_lead, damp_fac, true, true);
+    auto H_leadL = Hamilt_k (L_lead, t_lead, mu_leadL, damp_fac, true, true);
     cout << "H right lead" << endl;
-    auto H_leadR = Hamilt_k (L_lead, t_lead, mu_lead, damp_fac, false, true);
+    auto H_leadR = Hamilt_k (L_lead, t_lead, mu_leadR, damp_fac, false, true);
     cout << "H dev" << endl;
     auto H_dev   = Hamilt_k (L_device, t_device, mu_device, 1., true, true);
-    auto system = WireSystem (H_leadL, H_dev, H_leadR, verbose);
+    auto system = WireSystem (H_leadL, H_dev, H_leadR);
     system.attach_leads (t_contactL, t_contactR);
     if (do_write)
         system.write (out_dir+"/"+out_Hamilt);
+    system.print_orbs();
 
-    auto sites = Fermion (system.L(), {"ConserveQNs",ConserveQNs});
+    auto sites = Fermion (system.N(), {"ConserveNf",ConserveNf});
+   // auto sites = MixedBasis (system.N(), system.N()/2, {"MaxOcc",10,"ConserveQNs",ConserveQNs});
     auto ampo = system.ampo (sites);
     auto H = toMPO (ampo);
     cout << "MPO dim = " << maxLinkDim(H) << endl;
@@ -114,7 +139,7 @@ int main(int argc, char* argv[])
 
     // Initialze MPS
     MPS psi;
-    if (ConserveQNs)
+    if (true)//(ConserveNf)
         psi = make_initstate (sites, Np);
     else
         psi = randomMPS (sites, 10);
@@ -122,7 +147,28 @@ int main(int argc, char* argv[])
 
 
     // DMRG
-    MyObserver<Fermion> myobs (sites, psi, {"Write",do_write,"out_dir",out_dir,"out_minm",out_minm});
-    dmrg (psi, H, sweeps, myobs, {"WriteDim",WriteDim});
+    MyObserver myobs (sites, psi, {"Write",do_write,"out_dir",out_dir,"out_minm",out_minm});
+    auto en = dmrg (psi, H, sweeps, myobs, {"WriteDim",WriteDim});
+    auto d1 = maxLinkDim(psi);
+
+    // Reorder basis
+    {
+        auto ns = myobs.ns();
+        for(int i = 0; i < reorderN; i++)
+        {
+            reorder_basis (psi, system, ns, {"Cutoff",cutoff_reorder,"reverse",true});
+            auto d2 = maxLinkDim(psi);
+            cout << "original/rotated dim = " << d1 << " " << d2 << endl;
+
+            cout << "Redo DMRG" << endl;
+            ampo = system.ampo (sites);
+            H = toMPO (ampo);
+            auto en2 = dmrg (psi, H, sweeps, myobs, {"WriteDim",WriteDim});
+            cout << "old/new energy = " << en << " " << en2 << endl;
+
+            ns = myobs.ns();
+            if (ordered (ns)) break;
+        }
+    }
     return 0;
 }

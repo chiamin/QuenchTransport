@@ -1,16 +1,20 @@
 basic
 {
-    L_lead = 200
-    L_device = 1
+    L_lead = 40
+    L_device = 8
     t_lead = 1
     t_device = 1
-    t_contactL = 1
+    t_contactL = 0.5
     t_contactR = 0.5
-    mu_lead = 0
+    mu_leadL = 0
+    mu_leadR = 0
     mu_device = 0
     V_device = 0
-    damp_decay_length = 50
+    damp_decay_length = 20
     ConserveQNs = no
+
+    reorderN = 10
+    cutoff_reorder = 1e-10
 
     local_mu
     {
@@ -23,7 +27,7 @@ basic
     }
 
     write_to_file = yes
-    outdir = tp0.5
+    outdir = reorder
     out_minm = 0
     out_Hamilt = H
 
@@ -37,6 +41,7 @@ basic
         maxm   cutoff   niter  noise    nsweep
         16     1E-12    10     0        4
         32     1E-12    10     0        4
+}
         64     1E-12    10     0        4
         128    1E-12    10     0        4
         200    1E-12    10     0        3

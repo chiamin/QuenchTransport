@@ -54,8 +54,8 @@ def get_hop_t (fname):
     return ts
 
 def get_data (fname):
-    dmrgdir = get_para (fname, 'input_dir', str)
-    dmrgfile = glob.glob (dmrgdir+'/out')[0]
+    #dmrgdir = get_para (fname, 'input_dir', str)
+    #dmrgfile = glob.glob ('../gs/*.out')[0]
     L_lead = get_para (dmrgfile, 'L_lead', int)
     L_device = get_para (dmrgfile, 'L_device', int)
     L = 2*L_lead + L_device
@@ -67,7 +67,7 @@ def get_data (fname):
     Is_spec = np.full ((Nstep,L), np.nan)
     ns = np.full ((Nstep,L), np.nan)
     Ss = np.full ((Nstep,L), np.nan)
-
+    dims = np.full ((Nstep,L), np.nan)
     with open(fname) as f:
         for line in f:
             line = line.lstrip()
@@ -95,7 +95,12 @@ def get_data (fname):
                 i = int(tmp[2])
                 S = float(tmp[-1])
                 Ss[step-1,i-1] = S
-    return Is, Is_spec, ns, Ss
+            elif line.startswith('bond dim'):
+                tmp = line.split()
+                i = int(tmp[-3])
+                m = float(tmp[-1])
+                dims[step-1,i-1] = m
+    return Is, Is_spec, ns, Ss, dims
 
 def plot_prof (ax, data, dt, label=''):
     Nstep, L = np.shape(data)
@@ -105,32 +110,49 @@ def plot_prof (ax, data, dt, label=''):
     ax.set_ylabel ('time')
     cb.ax.set_ylabel (label)
 
-def plot_time_slice (ax, data, n):
+def plot_time_slice (ax, data, n, xs=[], **args):
     Nstep, L = np.shape(data)
     itv = Nstep // n
-    xs = range(1,L+1)
+    if xs == []:
+        xs = range(1,L+1)
     for d in data[::itv,:]:
-        ax.plot (xs, d, marker='.')
-    ax.plot (xs, data[-1,:], marker='.')
+        ax.plot (xs, d, marker='.', **args)
+    ax.plot (xs, data[-1,:], marker='.', **args)
+
+def get_basis_en (fname):
+    ens = []
+    with open(fname) as f:
+        for line in f:
+            if 'orbitals, segment, ki, energy' in line:
+                for line in f:
+                    tmp = line.split()
+                    if not tmp[0].isdigit():
+                        return ens
+                    ens.append (float(tmp[-1]))
 
 if __name__ == '__main__':
+    dmrgfile = glob.glob ('../dmrg/out')[0]
+
     files = [i for i in sys.argv[1:] if i[0] != '-']
     fi,axi = pl.subplots()
     for fname in files:
         print (fname)
+
+        en_basis = get_basis_en (fname)
+
         # Get data
-        Is, Is_spec, ns, Ss = get_data (fname)
+        Is, Is_spec, ns, Ss, dims = get_data (fname)
         dt = get_para (fname, 'dt', float)
         m = get_para (fname, 'Largest link dim', int)
         Nstep, L = np.shape(Is)
 
         # I profile
-        f,ax = pl.subplots()
+        '''f,ax = pl.subplots()
         plot_prof (ax, Is, dt, 'current')
         ax.set_title ('$m='+str(m)+'$')
         ps.set(ax)
 
-        '''f8,ax8 = pl.subplots()
+        f8,ax8 = pl.subplots()
         plot_time_slice (ax8, Is, n=3)
         ps.set(ax8)'''
 
@@ -140,9 +162,12 @@ if __name__ == '__main__':
         ax2.set_title ('$m='+str(m)+'$')
         ps.set(ax2)
 
-        f7,ax7 = pl.subplots()
-        plot_time_slice (ax7, ns, n=3)
-        ps.set(ax7)'''
+        f,ax = pl.subplots()
+        plot_time_slice (ax, ns, n=5, xs=en_basis, ls='None')
+        #ax.plot (range(1,len(en_basis)+1), en_basis)
+        ax.set_xlabel ('energy')
+        ax.set_ylabel ('occupasion')
+        ps.set(ax)'''
 
         # S profile
         '''f5,ax5 = pl.subplots()
@@ -156,6 +181,12 @@ if __name__ == '__main__':
         ax6.set_ylabel ('entropy')
         ps.set(ax6)'''
 
+        f,ax = pl.subplots()
+        plot_time_slice (ax, dims, n=5)
+        ax.set_xlabel ('site')
+        ax.set_ylabel ('bond dimension')
+        ps.set(ax)
+
         ts = dt * np.arange(1,Nstep+1)
         idevL, idevR = get_para (fname, 'device site', int, n=2)
         print (idevL, idevR)
@@ -166,11 +197,11 @@ if __name__ == '__main__':
         ps.set(ax3)'''
 
         # current vs time
-        muL = get_para (fname, 'mu_leadL', float)
-        muR = get_para (fname, 'mu_leadR', float)
+        muL = get_para (fname, 'bias_leadL', float)
+        muR = get_para (fname, 'bias_leadL', float)
         Vb = muR - muL
-        Il = Is_spec[:, idevL-2] / Vb
-        Ir = Is_spec[:, idevR-1] / Vb
+        Il = Is_spec[:, idevL-2] #/ Vb
+        Ir = Is_spec[:, idevR-1] #/ Vb
         axi.plot (ts, Il, marker='.', label='left')
         axi.plot (ts, Ir, marker='.', label='right')
         #axi.plot (ts, Is[:, idevL-3] / Vb, marker='.', label='l2')
@@ -179,10 +210,10 @@ if __name__ == '__main__':
         axi.set_ylabel ('conductance')
         axi.legend()
 
-        dmrgdir = get_para (fname, 'input_dir', str)
+        '''dmrgdir = get_para (fname, 'input_dir', str)
         dmrgfile = glob.glob (dmrgdir+'/out')[0]
         tp = get_para (dmrgfile, 't_contactR', float)
-        axi.axhline (-exactG(0, tp), ls='--', c='gray')
+        axi.axhline (-exactG(0, tp), ls='--', c='gray')'''
 
         ps.set(axi)
 

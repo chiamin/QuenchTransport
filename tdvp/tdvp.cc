@@ -12,6 +12,9 @@ Timers timer;
 #include "MixedBasis.h"
 #include "SubCorr.h"
 #include "MeaCurrent.h"
+#include "ReadWriteFile.h"
+#include "ContainerUtility.h"
+using namespace vectool;
 using namespace itensor;
 using namespace std;
 
@@ -32,9 +35,9 @@ void writeAll (const string& filename,
                int step)
 {
     ofstream ofs (filename);
-    write (ofs, psi);
-    write (ofs, H);
-    write (ofs, step);
+    itensor::write (ofs, psi);
+    itensor::write (ofs, H);
+    itensor::write (ofs, step);
 }
 
 void readAll (const string& filename,
@@ -42,19 +45,45 @@ void readAll (const string& filename,
               int& step)
 {
     ifstream ifs = open_file (filename);
-    read (ifs, psi);
-    read (ifs, H);
-    read (ifs, step);
+    itensor::read (ifs, psi);
+    itensor::read (ifs, H);
+    itensor::read (ifs, step);
+}
+
+vector<Real> order_by_bias (const WireSystem& system, Real bias)
+{
+    // Set order
+    Real en0 = 0.5 * abs(bias);
+    vector<Real> order;
+    for(int i = 0; i < system.orbs().size(); i++)
+    {
+        auto [seg, ind, en] = system.orbs().at(i);
+        if (seg == "S")
+        {
+            order.push_back (0.);
+        }
+        else if (en < 0.)
+        {
+            Real d = abs (en + en0);
+            order.push_back (-d);
+        }
+        else
+        {
+            Real d = abs (en - en0);
+            order.push_back (d);
+        }
+    }
+    return order;
 }
 
 int main(int argc, char* argv[])
 {
-timer.start();
+    timer.start();
     string infile = argv[1];
     InputGroup input (infile,"basic");
-    auto mu_leadL   = input.getReal("mu_leadL");
-    auto mu_leadR   = input.getReal("mu_leadR");
-    auto mu_device  = input.getReal("mu_device");
+    auto bias_leadL   = input.getReal("bias_leadL");
+    auto bias_leadR   = input.getReal("bias_leadR");
+    auto bias_device  = input.getReal("bias_device");
 
     auto SubCorrN   = input.getInt("SubCorrN",-1);
     auto corr_cutoff = input.getReal("corr_cutoff");
@@ -66,7 +95,7 @@ timer.start();
     auto dt            = input.getReal("dt");
     auto time_steps    = input.getInt("time_steps");
     auto NumCenter     = input.getInt("NumCenter");
-    auto ConserveQNs   = input.getYesNo("ConserveQNs",false);
+    auto ConserveNf    = input.getYesNo("ConserveNf",false);
     auto sweeps        = Read_sweeps (infile);
 
     auto UseSVD        = input.getYesNo("UseSVD",true);
@@ -84,6 +113,9 @@ timer.start();
     if (write_dir == "." && out_dir != ".")
         write_dir = out_dir;
 
+    auto reorder        = input.getYesNo("reorder",false);
+    auto cutoff_reorder = input.getReal("cutoff_reorder",1e-12);
+
     auto system = make_shared <WireSystem> ();
     system->read (input_dir+"/"+H_file);
 
@@ -98,13 +130,21 @@ timer.start();
         // Read MPS in the window
         readFromFile (input_dir+"/"+psi_file, psi);
         int N = length (psi);
+        // Reorder basis
+        if (reorder)
+        {
+            Real bias = bias_leadR - bias_leadL;
+            auto new_order = order_by_bias (*system, bias);
+            reorder_basis (psi, *system, new_order, {"Cutoff",cutoff_reorder,"verbose",true});
+            cout << "dim after reorder = " << maxLinkDim (psi) << endl;
+        }
         // Site indices
         auto site_inds = get_site_inds (psi);
         sites = Fermion (site_inds);
         // Hamiltonian
-        system->add_mu (SegL, mu_leadL);
-        system->add_mu (SegR, mu_leadR);
-        system->add_mu (SegS, mu_device);
+        system->add_mu ("L", bias_leadL);
+        system->add_mu ("R", bias_leadR);
+        system->add_mu ("S", bias_device);
         auto ampo = system->ampo (sites);
         H = toMPO (ampo);
     }
@@ -114,17 +154,18 @@ timer.start();
         auto site_inds = get_site_inds (psi);
         sites = Fermion (site_inds);
     }
+    system->print_orbs();
     cout << "H MPO dim = " << maxLinkDim(H) << endl;
-    cout << "device site = " << system->idevL() << " " << system->idevR() << endl;
+    int idevL = system->idevL(),
+        idevR = system->idevR();
+    cout << "device site = " << idevL << " " << idevR << endl;
 
     // Args parameters
-    if (SubCorrN == -1) SubCorrN = length(sites);
-    Args args_obs   = {"ConserveQNs",ConserveQNs};
     Args args_tdvp  = {"Quiet",true,"NumCenter",NumCenter,"DoNormalize",true,
                        "UseSVD",UseSVD,"SVDmethod",SVDmethod,"WriteDim",WriteDim};
 
     // Observer
-    auto obs = MyObserver (sites, psi, args_obs);
+    auto obs = MyObserver (sites, psi);
     // Current
     int N = length (psi);
     // MPO
@@ -136,11 +177,20 @@ timer.start();
         JMPOs.at(i) = mpo;
     }
     // Correlation
+    if (SubCorrN < 0 or SubCorrN > length(psi))
+    {
+        SubCorrN = length(psi);
+    }
+    else if (SubCorrN < idevR-idevL+1)
+    {
+        cout << "sub-correlation size is too small: " << SubCorrN << endl;
+        cout << "device size = " << idevL-idevR+1 << endl;
+        throw;
+    }
     int l = (N - SubCorrN) / 2;
     int ibeg = l+1,
         iend = l+SubCorrN;
     auto sub_corr = SubCorr (system, ibeg, iend);
-
 
     // Time evolution
     cout << "Start time evolution" << endl;
@@ -151,12 +201,13 @@ timer.start();
     {
         cout << "step = " << step << endl;
 
+        // Time evolution
         timer["tdvp"].start();
         tdvp (psi, H, 1_i*dt, sweeps, obs, args_tdvp);
         timer["tdvp"].stop();
+        auto d1 = maxLinkDim(psi);
 
         // Measure currents by correlations
-
         timer["current corr"].start();
         sub_corr.measure (psi, {"Cutoff",corr_cutoff});
         timer["current corr"].stop();
@@ -167,6 +218,7 @@ timer.start();
             timer["current corr"].stop();
             cout << "\t*current " << j << " " << j+1 << " = " << J << endl;
         }
+        // Measure currents by MPO
         for(int j : spec_links)
         {
             timer["current mps"].start();
@@ -181,7 +233,7 @@ timer.start();
         }
         step++;
     }
-        timer.print();
+    timer.print();
 
     return 0;
 }

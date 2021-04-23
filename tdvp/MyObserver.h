@@ -16,7 +16,7 @@ class MyObserver : public DMRGObserver
         MyObserver (const Fermion& sites, const MPS& psi, const Args& args=Args::global())
         : DMRGObserver (psi, args)
         , _sites (sites)
-        , _ns (length(psi)+1,0.)
+        , _ns (length(psi),0.)
         , _Npar (0.)
         , _specs (length(psi))
         {
@@ -26,7 +26,8 @@ class MyObserver : public DMRGObserver
 
         void measure (const Args& args);
 
-        Real Npar () const { return _Npar; }
+             Real   Npar () const { return _Npar; }
+        auto const& ns   () const { return _ns; }
         const Spectrum& spec (int i) const { return _specs.at(i); }
 
     private:
@@ -74,6 +75,7 @@ void MyObserver :: measure (const Args& args)
         ITensor n_op = _sites.op("N",oc);
         Real ni = Onsite_mea (psi().A(oc), n_op);
         cout << "\tn " << oc << " = " << ni << endl;
+        _ns.at(oc-1) = ni;
 
         // Entanglement entropy
         Real S = EntangEntropy (spectrum());

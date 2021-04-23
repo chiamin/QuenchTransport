@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include "itensor/all.h"
 #include "Corr.h"
-#include "MixedBasis.h"
+#include "SystemStruct.h"
 using namespace std;
 using namespace itensor;
 
@@ -24,13 +24,13 @@ class SubCorr
 
         // For each segment, the local k involved in the sub-correlation
         // _sub_local_ks.at(segment) = [k in sub-correlation]
-        unordered_map<Segment,vector<int>> _sub_local_ks;
+        unordered_map<string,vector<int>> _sub_local_ks;
 
         // The correlations C_{s1,s2}(k1,k2) between two segments
-        map<pair<Segment,Segment>,ITensor> _corr_segs;
+        map<pair<string,string>,ITensor> _corr_segs;
 
-        ITensor Corr_segs   (Segment s1, Segment s2);
-        ITensor get_Uik     (Segment seg, int i_seg, Index ii) const;
+        ITensor Corr_segs   (string s1, string s2);
+        ITensor get_Uik     (string seg, int i_seg, Index ii) const;
         Cplx    get_corr    (int k1, int k2) const;        // (k1,k2) are global k indices
 };
 
@@ -46,7 +46,7 @@ SubCorr :: SubCorr (shared_ptr<const WireSystem> sys, int ibeg, int iend)
     // Store them for each segment
     for(int i = ibeg; i <= iend; i++)
     {
-        auto [seg, i_seg] = _sys->glob_to_loc(i);
+        auto [seg, i_seg] = _sys->to_loc(i);
         _sub_local_ks[seg].push_back (i_seg);
     }
 }
@@ -70,12 +70,12 @@ inline void SubCorr :: measure (const MPS& psi, Args args)
 
     // Store the correlation between two segments
     _corr_segs.clear();
-    vector<pair<Segment,Segment>> seg_pairs;
-    seg_pairs.emplace_back (SegL, SegL);
-    seg_pairs.emplace_back (SegL, SegS);
-    seg_pairs.emplace_back (SegS, SegS);
-    seg_pairs.emplace_back (SegS, SegR);
-    seg_pairs.emplace_back (SegR, SegR);
+    vector<pair<string,string>> seg_pairs;
+    seg_pairs.emplace_back ("L", "L");
+    seg_pairs.emplace_back ("L", "S");
+    seg_pairs.emplace_back ("S", "S");
+    seg_pairs.emplace_back ("S", "R");
+    seg_pairs.emplace_back ("R", "R");
     for(auto seg_pair : seg_pairs)
     {
         auto [s1, s2] = seg_pair;
@@ -105,7 +105,7 @@ Real SubCorr :: get_current (int site) const
 }
 
 // Collect the sub-correlation between segments <s1> and <s2>
-ITensor SubCorr :: Corr_segs (Segment s1, Segment s2)
+ITensor SubCorr :: Corr_segs (string s1, string s2)
 {
     // Find out the involved k in each segment
     auto ks1 = _sub_local_ks.at(s1);
@@ -121,11 +121,11 @@ ITensor SubCorr :: Corr_segs (Segment s1, Segment s2)
     for(int i1 = 0; i1 < N1; i1++)
     {
         int k1 = ks1.at(i1);                                    // For k1 in segment 1,
-        int k1_glob = _sys->orb_map (s1, k1);                   // find out the corresponding global index k1_glob
+        int k1_glob = _sys->to_glob (s1, k1);                   // find out the corresponding global index k1_glob
         for(int i2 = 0; i2 < N2; i2++)
         {
             int k2 = ks2.at(i2);                                // For k2 in segment 2,
-            int k2_glob = _sys->orb_map (s2, k2);               // find out the corresponding global index k2_glob
+            int k2_glob = _sys->to_glob (s2, k2);               // find out the corresponding global index k2_glob
             scorr.set (i1+1, i2+1, get_corr (k1_glob, k2_glob));    // Collect from the sub-correlation
         }
     }
@@ -135,10 +135,10 @@ ITensor SubCorr :: Corr_segs (Segment s1, Segment s2)
 // Get the coeffients U(i,k),
 // where c_i = \sum_k U(i,k) c_k
 // <site> is a global site-index
-ITensor SubCorr :: get_Uik (Segment seg, int i_seg, Index ii) const
+ITensor SubCorr :: get_Uik (string seg, int i_seg, Index ii) const
 {
     // Get U(i,k) for all k
-    auto uk = _sys->chain(seg).Ui(i_seg);
+    auto uk = _sys->part(seg).Ui(i_seg);
     // Get U(i,k) for k in sub-correlation
     auto ks = _sub_local_ks.at(seg);
     mycheck (dim(ii) == ks.size(), "dim not match");

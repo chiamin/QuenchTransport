@@ -1,19 +1,22 @@
 basic
 {
-    mu_leadL = -0.01
-    mu_device = 0
-    mu_leadR = 0.01
+    bias_leadL = 0
+    bias_device = 0.4
+    bias_leadR = 0.8
 
     dt = 1
-    time_steps = 30
-    NumCenter = 1
+    time_steps = 20
+    NumCenter = 2
     ConserveQNs = no
 
-    SubCorrN = 150
-    corr_cutoff = 1e-4
+    SubCorrN = 1000
+    corr_cutoff = 1e-12
 
-    input_dir = ../dmrg/tp0.5
-    psi_file = psi_m128.mps
+    reorder = no
+    cutoff_reorder = 1e-12
+
+    input_dir = ../dmrg/reorder
+    psi_file = psi_m32.mps
     H_file = H
 
     write = no
@@ -27,6 +30,6 @@ basic
     sweeps
     {
         maxm   minm   cutoff   niter  noise    nsweep
-        200    16      1E-8     20     0        1
+        200    16      1E-6     20     0        1
     }
 }
