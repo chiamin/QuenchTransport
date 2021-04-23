@@ -7,7 +7,7 @@ basic
     dt = 1
     time_steps = 20
     NumCenter = 2
-    ConserveQNs = no
+    ConserveNf = no
 
     SubCorrN = 1000
     corr_cutoff = 1e-12
