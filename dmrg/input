@@ -11,9 +11,11 @@ basic
     mu_device = 0
     V_device = 0
     damp_decay_length = 20
-    ConserveQNs = no
 
-    reorderN = 10
+    ConserveQNs = no
+    ConserveNf = no
+
+    reorderN = 0
     cutoff_reorder = 1e-10
 
     local_mu
@@ -27,7 +29,7 @@ basic
     }
 
     write_to_file = yes
-    outdir = reorder
+    outdir = .
     out_minm = 0
     out_Hamilt = H
 

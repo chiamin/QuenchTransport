@@ -7,15 +7,14 @@ basic
     dt = 1
     time_steps = 20
     NumCenter = 2
-    ConserveNf = no
 
     SubCorrN = 1000
     corr_cutoff = 1e-12
 
-    reorder = no
+    reorder = yes
     cutoff_reorder = 1e-12
 
-    input_dir = ../dmrg/reorder
+    input_dir = ../dmrg/
     psi_file = psi_m32.mps
     H_file = H
 

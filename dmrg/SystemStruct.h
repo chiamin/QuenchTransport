@@ -381,7 +381,19 @@ void reorder_basis (MPS& psi, WireSystem& system, vector<T>& ns, const Args& arg
     bool verbose = args.getBool("verbose",false);
     auto sites = siteInds (psi);
     auto gates = GateContainer();
-    gates.new_gate<2> ("swap", sites, iutility::SwapGate);
+
+    // Make swap gate
+    auto i1 = sites(1);
+    auto i2 = sites(2);
+    auto i1_pr = prime(i1),
+         i2_pr = prime(i2);
+    ITensor swap (dag(i1), dag(i2), i1_pr, i2_pr);
+    swap.set (1,1,1,1,1.);
+    swap.set (1,2,2,1,1.);
+    swap.set (2,1,1,2,1.);
+    swap.set (2,2,2,2,-1.);
+
+    gates.new_gate ("swap", swap, i1, i2);
     vector<int> swap_pos = system.reorder_basis (ns, reverse);
     for(int i : swap_pos)
         gates.add ("swap",i);

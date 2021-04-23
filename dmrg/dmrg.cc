@@ -104,14 +104,15 @@ int main(int argc, char* argv[])
     auto V_device   = input.getReal("V_device");
     auto damp_decay_length = input.getReal("damp_decay_length");
 
-    auto do_write   = input.getYesNo("write_to_file");
-    auto out_dir    = input.getString("outdir",".");
-    auto out_minm   = input.getInt("out_minm",0);
-    auto out_Hamilt = input.getString("out_Hamilt","H");
-    auto ConserveNf = input.getYesNo("ConserveNf",false);
-    auto WriteDim   = input.getInt("WriteDim",-1);
-    auto verbose    = input.getYesNo("verbose",false);
-    auto sweeps     = Read_sweeps (infile);
+    auto ConserveQNs = input.getYesNo("ConserveQNs",false);
+    auto ConserveNf  = input.getYesNo("ConserveNf",false);
+    auto do_write    = input.getYesNo("write_to_file");
+    auto out_dir     = input.getString("outdir",".");
+    auto out_minm    = input.getInt("out_minm",0);
+    auto out_Hamilt  = input.getString("out_Hamilt","H");
+    auto WriteDim    = input.getInt("WriteDim",-1);
+    auto verbose     = input.getYesNo("verbose",false);
+    auto sweeps      = Read_sweeps (infile);
 
     auto reorderN   = input.getInt("reorderN",0);
     auto cutoff_reorder = input.getReal("cutoff_reorder",1e-12);
@@ -130,7 +131,7 @@ int main(int argc, char* argv[])
         system.write (out_dir+"/"+out_Hamilt);
     system.print_orbs();
 
-    auto sites = Fermion (system.N(), {"ConserveNf",ConserveNf});
+    auto sites = Fermion (system.N(), {"ConserveQNs",ConserveQNs,"ConserveNf",ConserveNf});
    // auto sites = MixedBasis (system.N(), system.N()/2, {"MaxOcc",10,"ConserveQNs",ConserveQNs});
     auto ampo = system.ampo (sites);
     auto H = toMPO (ampo);

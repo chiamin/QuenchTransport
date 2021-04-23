@@ -95,7 +95,6 @@ int main(int argc, char* argv[])
     auto dt            = input.getReal("dt");
     auto time_steps    = input.getInt("time_steps");
     auto NumCenter     = input.getInt("NumCenter");
-    auto ConserveNf    = input.getYesNo("ConserveNf",false);
     auto sweeps        = Read_sweeps (infile);
 
     auto UseSVD        = input.getYesNo("UseSVD",true);
