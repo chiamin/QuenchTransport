@@ -227,8 +227,10 @@ int main(int argc, char* argv[])
         }
 
         if (write)
-        {            
+        {
+            timer["write"].start();
             writeAll (write_dir+"/"+write_file, psi, H, step);
+            timer["write"].stop();
         }
         step++;
     }
