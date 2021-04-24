@@ -50,7 +50,7 @@ void readAll (const string& filename,
     itensor::read (ifs, step);
 }
 
-vector<Real> order_by_bias (const WireSystem& system, Real bias)
+vector<Real> order_by_bias (const WireSystem& system, Real bias, Real threshold=0.01)
 {
     // Set order
     Real en0 = 0.5 * abs(bias);
@@ -61,6 +61,10 @@ vector<Real> order_by_bias (const WireSystem& system, Real bias)
         if (seg == "S")
         {
             order.push_back (0.);
+        }
+        else if (abs(en) < threshold)
+        {
+            order.push_back (en);
         }
         else if (en < 0.)
         {
