@@ -99,6 +99,8 @@ int main(int argc, char* argv[])
     auto dt            = input.getReal("dt");
     auto time_steps    = input.getInt("time_steps");
     auto NumCenter     = input.getInt("NumCenter");
+    auto Truncate      = input.getYesNo("Truncate");
+    auto mixNumCenter  = input.getYesNo("mixNumCenter",false);
     auto sweeps        = Read_sweeps (infile);
 
     auto UseSVD        = input.getYesNo("UseSVD",true);
@@ -164,8 +166,8 @@ int main(int argc, char* argv[])
     cout << "device site = " << idevL << " " << idevR << endl;
 
     // Args parameters
-    Args args_tdvp  = {"Quiet",true,"NumCenter",NumCenter,"DoNormalize",true,
-                       "UseSVD",UseSVD,"SVDmethod",SVDmethod,"WriteDim",WriteDim};
+    Args args_tdvp  = {"Quiet",true,"NumCenter",NumCenter,"DoNormalize",true,"Truncate",Truncate,
+                       "UseSVD",UseSVD,"SVDmethod",SVDmethod,"WriteDim",WriteDim,"mixNumCenter",mixNumCenter};
 
     // Observer
     auto obs = MyObserver (sites, psi);

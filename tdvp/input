@@ -5,8 +5,10 @@ basic
     bias_leadR = 0.8
 
     dt = 1
-    time_steps = 20
-    NumCenter = 2
+    time_steps = 10
+    NumCenter = mix
+    Truncate = yes
+    mixNumCenter = yes
 
     SubCorrN = 1000
     corr_cutoff = 1e-12
@@ -18,7 +20,7 @@ basic
     psi_file = psi_m32.mps
     H_file = H
 
-    write = no
+    write = yes
     write_dir = .
     write_file = timeevol.save
     read = no
@@ -29,6 +31,6 @@ basic
     sweeps
     {
         maxm   minm   cutoff   niter  noise    nsweep
-        200    16      1E-6     20     0        1
+        16     8      1E-6     20     0        1
     }
 }

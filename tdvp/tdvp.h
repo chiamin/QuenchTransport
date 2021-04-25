@@ -151,6 +151,19 @@ TDVPWorker(MPS & psi,
     return energy;
     }
 
+vector<bool> reach_max_dim (const MPS& psi, int maxdim)
+{
+    int N = length(psi);
+    vector<bool> re (N);
+    for(int b = 1; b < N; b++)
+    {
+        int m = dim (rightLinkIndex (psi, b));
+        bool reach_max = (m >= maxdim ? true : false);
+        re.at(b) = reach_max;
+    }
+    return re;
+}
+
 template <class LocalOpT>
 Real
 TDVPWorker(MPS & psi,
@@ -159,7 +172,7 @@ TDVPWorker(MPS & psi,
            Sweeps const& sweeps,
            DMRGObserver& obs,
            Args args)
-    { 
+{
     // Truncate blocks of degenerate singular values (or not)
     args.add("RespectDegenerate",args.getBool("RespectDegenerate",true));
 
@@ -173,7 +186,7 @@ TDVPWorker(MPS & psi,
         }
     const bool quiet = args.getBool("Quiet",false);
     const int debug_level = args.getInt("DebugLevel",(quiet ? -1 : 0));
-    const bool autoNumCenter = args.getBool("autoNumCenter",false);
+    const bool mixNumCenter = args.getBool("mixNumCenter",false);
 
     const int N = length(psi);
     Real energy = NAN;
@@ -185,17 +198,12 @@ TDVPWorker(MPS & psi,
         psi.position(1);
 
     args.add("DebugLevel",debug_level);
-    //args.add("DoNormalize",true);
 
     for(int sw = 1; sw <= sweeps.nsweep(); ++sw)
-        {
-        if (autoNumCenter && maxLinkDim (psi) >= sweeps.maxdim(sweeps.nsweep()))
-            args.add("NumCenter",1);
+    {
         int numCenter = args.getInt("NumCenter",2);
-        if(numCenter != 1)
-            args.add("Truncate",args.getBool("Truncate",true));
-        else
-            args.add("Truncate",args.getBool("Truncate",false));
+
+        args.add("Truncate",true);
 
         cpu_time sw_time;
         args.add("Sweep",sw);
@@ -204,7 +212,13 @@ TDVPWorker(MPS & psi,
         args.add("MinDim",sweeps.mindim(sw));
         args.add("MaxDim",sweeps.maxdim(sw));
         args.add("MaxIter",sweeps.niter(sw));
- 
+
+        vector<bool> is_maxdim;
+        if (mixNumCenter)
+        {
+            is_maxdim = reach_max_dim (psi, args.getInt("MaxDim"));
+        } 
+
         if(!H.doWrite()
            && args.defined("WriteDim")
            && sweeps.maxdim(sw) >= args.getInt("WriteDim"))
@@ -222,8 +236,8 @@ TDVPWorker(MPS & psi,
         // 0, 1 and 2-site wavefunctions
         ITensor phi0,phi1;
         Spectrum spec;
-        for(int b = 1, ha = 1; ha <= 2; sweepnext(b,ha,N,{"NumCenter=",numCenter}))
-            {
+        for(int b = 1, ha = 1; ha <= 2; )
+        {
             if (halfSweep == "toRight" && ha == 2)
                 continue;
             else if (halfSweep == "toLeft" && ha == 1)
@@ -232,6 +246,7 @@ TDVPWorker(MPS & psi,
             if(!quiet)
                 printfln("Sweep=%d, HS=%d, Bond=%d/%d",sw,ha,b,(N-1));
 
+            // Forward propagation
             H.numCenter(numCenter);
             H.position(b,psi);
 
@@ -240,7 +255,7 @@ TDVPWorker(MPS & psi,
             else if(numCenter == 1)
                 phi1 = psi(b);
 
-            applyExp(H,phi1,t/2,args);
+            applyExp(H,phi1,-t/2,args);
 
             if(args.getBool("DoNormalize",true))
                 phi1 /= norm(phi1);
@@ -250,11 +265,36 @@ TDVPWorker(MPS & psi,
             else if(numCenter == 1)
                 psi.ref(b) = phi1;
 
-           // Calculate energy
+            // Calculate energy
             ITensor H_phi1;
             H.product(phi1,H_phi1);
             energy = real(eltC(dag(phi1)*H_phi1));
  
+
+            // mixed Nc
+            if (mixNumCenter)
+            {
+                int maxdim = sweeps.maxdim(sw);
+                if (ha == 1)
+                {
+                    if (numCenter == 2 and b < N-1 and !is_maxdim.at(b) and is_maxdim.at(b+1))
+                    {
+                        phi1 = psi(b+1);
+                        numCenter = 1;
+                        b += 1;
+                    }
+                }
+                else if (ha == 2)
+                {
+                    if (numCenter == 2 and b > 1 and !is_maxdim.at(b) and is_maxdim.at(b-1))
+                    {
+                        phi1 = psi(b);
+                        numCenter = 1;
+                    }
+                }
+            }
+
+            // Backward propagation
             if((ha == 1 && b+numCenter-1 != N) || (ha == 2 && b != 1))
                 {
                 auto b1 = (ha == 1 ? b+1 : b);
@@ -277,7 +317,7 @@ TDVPWorker(MPS & psi,
                 H.numCenter(numCenter-1);
                 H.position(b1,psi);
  
-                applyExp(H,phi0,-t/2,args);
+                applyExp(H,phi0,+t/2,args);
  
                 if(args.getBool("DoNormalize",true))
                     phi0 /= norm(phi0);
@@ -300,7 +340,6 @@ TDVPWorker(MPS & psi,
                         psi.leftLim(b-2);
                         psi.rightLim(b);
                         }
-//cout << "pp = " << orthoCenter(psi) << endl;
                     }
  
                 // Calculate energy
@@ -329,27 +368,48 @@ TDVPWorker(MPS & psi,
 
             obs.measure(args);
 
-            } //for loop over b
+            // Next sweep
+            if (mixNumCenter)
+            {
+                int maxdim = sweeps.maxdim(sw);
+                if (ha == 1)
+                {
+                    if (numCenter == 1 and b != N and is_maxdim.at(b) and !is_maxdim.at(b+1))
+                    {
+                        numCenter = 2;
+                    }
+                }
+                else if (ha == 2)
+                {
+                    if (numCenter == 1 and b > 2 and is_maxdim.at(b-1) and !is_maxdim.at(b-2))
+                    {
+                        numCenter = 2;
+                        b -= 1;
+                    }
+                }
+            }
+            sweepnext(b,ha,N,{"NumCenter=",numCenter});
+        } //for loop over b
 
         if(!silent)
-            {
+        {
             auto sm = sw_time.sincemark();
             printfln("    Sweep %d/%d CPU time = %s (Wall time = %s)",
                      sw,sweeps.nsweep(),showtime(sm.time),showtime(sm.wall));
-            }
+        }
         
         if(obs.checkDone(args)) break;
   
-        } //for loop over sw
+    } //for loop over sw
   
     if(args.getBool("DoNormalize",true))
-        {
+    {
         //if(numCenter==1) psi.position(1);
         psi.normalize();
-        }
+    }
 
     return energy;
-    }
+}
 
 } //namespace itensor
 
