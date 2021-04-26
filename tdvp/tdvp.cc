@@ -14,6 +14,7 @@ Timers timer;
 #include "MeaCurrent.h"
 #include "ReadWriteFile.h"
 #include "ContainerUtility.h"
+#include "basisextension.h"
 using namespace vectool;
 using namespace itensor;
 using namespace std;
@@ -101,6 +102,8 @@ int main(int argc, char* argv[])
     auto NumCenter     = input.getInt("NumCenter");
     auto Truncate      = input.getYesNo("Truncate");
     auto mixNumCenter  = input.getYesNo("mixNumCenter",false);
+    auto global_expansion_N = input.getInt("global_expansion_N",std::numeric_limits<int>::max());
+    auto cutoff_global_expansion = input.getReal("cutoff_global_expansion",1e-8);
     auto sweeps        = Read_sweeps (infile);
 
     auto UseSVD        = input.getYesNo("UseSVD",true);
@@ -202,11 +205,21 @@ int main(int argc, char* argv[])
     cout << sweeps << endl;
     psi.position(1);
     Real en, err;
+    Args args_tdvp_expansion = {"Cutoff",cutoff_global_expansion, "Method","DensityMatrix",
+                                "KrylovOrd",3, "DoNormalize",true, "Quiet",true};
     for(int i = 0; i < time_steps; i++)
     {
         cout << "step = " << step << endl;
 
         // Time evolution
+        if (cutoff_global_expansion != 0. and i < global_expansion_N)
+        {
+            timer["glob expan"].start();
+            // Global subspace expansion
+            std::vector<Real> epsilonK = {1E-8, 1E-8};
+            addBasis (psi, H, epsilonK, args_tdvp_expansion);
+            timer["glob expan"].stop();
+        }
         timer["tdvp"].start();
         tdvp (psi, H, 1_i*dt, sweeps, obs, args_tdvp);
         timer["tdvp"].stop();

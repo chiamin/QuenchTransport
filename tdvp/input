@@ -5,15 +5,17 @@ basic
     bias_leadR = 0.8
 
     dt = 1
-    time_steps = 10
-    NumCenter = mix
+    time_steps = 40
+    NumCenter = 1
     Truncate = yes
     mixNumCenter = yes
+    global_expansion_N = 10000
+    cutoff_global_expansion = 1e-4
 
     SubCorrN = 1000
     corr_cutoff = 1e-12
 
-    reorder = yes
+    reorder = no
     cutoff_reorder = 1e-12
 
     input_dir = ../dmrg/
@@ -31,6 +33,6 @@ basic
     sweeps
     {
         maxm   minm   cutoff   niter  noise    nsweep
-        16     8      1E-6     20     0        1
+        300    8      1E-8     20     0        1
     }
 }
