@@ -112,7 +112,7 @@ class WireSystem
 {
     public:
         WireSystem () {}
-        WireSystem (const Matrix& H0_L, const Matrix& H0_S, const Matrix& H0_R);
+        WireSystem (const Matrix& H0_L, const Matrix& H0_S, const Matrix& H0_R, const Args& args=Args::global());
 
         void    attach_leads (Real tL, Real tR);
         void    add_mu       (const string& part, Real mu);
@@ -191,8 +191,8 @@ sort_by_energy_S_middle
 }
 
 vector<BasisInfo>
-sort_elc_hole_sep
-(const NonInterChain& leadL, const NonInterChain& leadR, const NonInterChain& chainS)
+sort_elec_hole_sep
+(const NonInterChain& leadL, const NonInterChain& leadR, const NonInterChain& chainS, bool bias_lowL_highR)
 {
     auto orbs_L = sort_by_energy ({leadL});
     auto orbs_R = sort_by_energy ({leadR});
@@ -212,11 +212,22 @@ sort_elc_hole_sep
     }
 
     auto orbs = vector<BasisInfo> ();
-    orbs.insert (orbs.end(), orbs_R.begin(), it_R0);
-    orbs.insert (orbs.end(), orbs_L.begin(), it_L0);
-    orbs.insert (orbs.end(), orbs_S.begin(), orbs_S.end());
-    orbs.insert (orbs.end(), it_R0, orbs_R.end());
-    orbs.insert (orbs.end(), it_L0, orbs_L.end());
+    if (bias_lowL_highR)
+    {
+        orbs.insert (orbs.end(), orbs_R.begin(), it_R0);
+        orbs.insert (orbs.end(), orbs_L.begin(), it_L0);
+        orbs.insert (orbs.end(), orbs_S.begin(), orbs_S.end());
+        orbs.insert (orbs.end(), it_R0, orbs_R.end());
+        orbs.insert (orbs.end(), it_L0, orbs_L.end());
+    }
+    else
+    {
+        orbs.insert (orbs.end(), orbs_L.begin(), it_L0);
+        orbs.insert (orbs.end(), orbs_R.begin(), it_R0);
+        orbs.insert (orbs.end(), orbs_S.begin(), orbs_S.end());
+        orbs.insert (orbs.end(), it_L0, orbs_L.end());
+        orbs.insert (orbs.end(), it_R0, orbs_R.end());
+    }
     return orbs;
 }
 
@@ -274,7 +285,7 @@ inline void WireSystem :: print_orbs () const
     }
 }
 
-WireSystem :: WireSystem (const Matrix& H0_L, const Matrix& H0_S, const Matrix& H0_R)
+WireSystem :: WireSystem (const Matrix& H0_L, const Matrix& H0_S, const Matrix& H0_R, const Args& args)
 {
     _parts.emplace ("L", NonInterChain (H0_L, "L"));
     _parts.emplace ("R", NonInterChain (H0_R, "R"));
@@ -284,7 +295,7 @@ WireSystem :: WireSystem (const Matrix& H0_L, const Matrix& H0_S, const Matrix& 
     // Note: orbs[i]={segment,k,energy}, i is 0-index, k is 1-index
     //_orbs = sort_by_energy ({_parts.at("S"), _parts.at("L"), _parts.at("R")});
     //_orbs = sort_by_energy_S_middle (_parts.at("S"), {_parts.at("L"), _parts.at("R")});
-    _orbs = sort_elc_hole_sep (_parts.at("L"), _parts.at("R"), _parts.at("S"));
+    _orbs = sort_elec_hole_sep (_parts.at("L"), _parts.at("R"), _parts.at("S"), args.getBool("bias_lowL_highR"));
 
     update_order ();
 }

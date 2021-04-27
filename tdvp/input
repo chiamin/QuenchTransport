@@ -6,17 +6,17 @@ basic
 
     dt = 1
     time_steps = 40
-    NumCenter = 2
+    NumCenter = 1
     Truncate = yes
-    mixNumCenter = yes
+    mixNumCenter = no
 
     globExpanN          = 10000
     globExpanKrylovDim  = 3
-    globExpanCutoff     = 1e-4
+    globExpanCutoff     = 1e-5
     globExpanDim        = 300
     globExpanMethod     = Fit
-    globExpanHpsiCutoff = 1e-4
-    globExpanHpsiDim    = 100
+    globExpanHpsiCutoff = 1e-10
+    globExpanHpsiDim    = 50
 
     SubCorrN = 1000
     corr_cutoff = 1e-12

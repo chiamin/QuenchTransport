@@ -1,9 +1,9 @@
 basic
 {
-    L_lead = 40
+    L_lead = 50
     L_device = 8
     t_lead = 1
-    t_device = 1
+    t_device = 0.8
     t_contactL = 0.5
     t_contactR = 0.5
     mu_leadL = 0
@@ -11,8 +11,9 @@ basic
     mu_device = 0
     V_device = 0
     damp_decay_length = 20
+    bias_lowL_highR = no
 
-    ConserveQNs = no
+    ConserveQNs = yes
     ConserveNf = no
 
     reorderN = 0

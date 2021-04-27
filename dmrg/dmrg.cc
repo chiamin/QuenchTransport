@@ -103,6 +103,7 @@ int main(int argc, char* argv[])
     auto mu_device  = input.getReal("mu_device");
     auto V_device   = input.getReal("V_device");
     auto damp_decay_length = input.getReal("damp_decay_length");
+    auto bias_lowL_highR = input.getYesNo("bias_lowL_highR");
 
     auto ConserveQNs = input.getYesNo("ConserveQNs",false);
     auto ConserveNf  = input.getYesNo("ConserveNf",false);
@@ -125,7 +126,8 @@ int main(int argc, char* argv[])
     auto H_leadR = Hamilt_k (L_lead, t_lead, mu_leadR, damp_fac, false, true);
     cout << "H dev" << endl;
     auto H_dev   = Hamilt_k (L_device, t_device, mu_device, 1., true, true);
-    auto system = WireSystem (H_leadL, H_dev, H_leadR);
+
+    auto system = WireSystem (H_leadL, H_dev, H_leadR, {"bias_lowL_highR",bias_lowL_highR});
     system.attach_leads (t_contactL, t_contactR);
     if (do_write)
         system.write (out_dir+"/"+out_Hamilt);
