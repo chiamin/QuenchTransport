@@ -190,6 +190,36 @@ sort_by_energy_S_middle
     return orbs;
 }
 
+vector<BasisInfo>
+sort_elc_hole_sep
+(const NonInterChain& leadL, const NonInterChain& leadR, const NonInterChain& chainS)
+{
+    auto orbs_L = sort_by_energy ({leadL});
+    auto orbs_R = sort_by_energy ({leadR});
+    auto orbs_S = sort_by_energy ({chainS});
+
+    auto it_L0 = orbs_L.begin();
+    for(; it_L0 != orbs_L.end(); it_L0++)
+    {
+        auto [seg,i,en] = *it_L0;
+        if (en > 0.) break;
+    }
+    auto it_R0 = orbs_R.begin();
+    for(; it_R0 != orbs_R.end(); it_R0++)
+    {
+        auto [seg,i,en] = *it_R0;
+        if (en > 0.) break;
+    }
+
+    auto orbs = vector<BasisInfo> ();
+    orbs.insert (orbs.end(), orbs_R.begin(), it_R0);
+    orbs.insert (orbs.end(), orbs_L.begin(), it_L0);
+    orbs.insert (orbs.end(), orbs_S.begin(), orbs_S.end());
+    orbs.insert (orbs.end(), it_R0, orbs_R.end());
+    orbs.insert (orbs.end(), it_L0, orbs_L.end());
+    return orbs;
+}
+
 // Reorder _orbs based on <ns>, from small to large
 // Update  _to_glob and _to_local
 // Return the positions of swap gates
@@ -253,7 +283,8 @@ WireSystem :: WireSystem (const Matrix& H0_L, const Matrix& H0_S, const Matrix& 
     // --- Find the order for the leads ---
     // Note: orbs[i]={segment,k,energy}, i is 0-index, k is 1-index
     //_orbs = sort_by_energy ({_parts.at("S"), _parts.at("L"), _parts.at("R")});
-    _orbs = sort_by_energy_S_middle (_parts.at("S"), {_parts.at("L"), _parts.at("R")});
+    //_orbs = sort_by_energy_S_middle (_parts.at("S"), {_parts.at("L"), _parts.at("R")});
+    _orbs = sort_elc_hole_sep (_parts.at("L"), _parts.at("R"), _parts.at("S"));
 
     update_order ();
 }
@@ -385,9 +416,7 @@ void reorder_basis (MPS& psi, WireSystem& system, vector<T>& ns, const Args& arg
     // Make swap gate
     auto i1 = sites(1);
     auto i2 = sites(2);
-    auto i1_pr = prime(i1),
-         i2_pr = prime(i2);
-    ITensor swap (dag(i1), dag(i2), i1_pr, i2_pr);
+    ITensor swap (dag(i1), dag(i2), prime(i1), prime(i2));
     swap.set (1,1,1,1,1.);
     swap.set (1,2,2,1,1.);
     swap.set (2,1,1,2,1.);

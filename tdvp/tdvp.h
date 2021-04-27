@@ -203,8 +203,6 @@ TDVPWorker(MPS & psi,
     {
         int numCenter = args.getInt("NumCenter",2);
 
-        args.add("Truncate",true);
-
         cpu_time sw_time;
         args.add("Sweep",sw);
         args.add("NSweep",sweeps.nsweep());

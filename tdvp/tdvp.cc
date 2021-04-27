@@ -102,9 +102,15 @@ int main(int argc, char* argv[])
     auto NumCenter     = input.getInt("NumCenter");
     auto Truncate      = input.getYesNo("Truncate");
     auto mixNumCenter  = input.getYesNo("mixNumCenter",false);
-    auto global_expansion_N = input.getInt("global_expansion_N",std::numeric_limits<int>::max());
-    auto cutoff_global_expansion = input.getReal("cutoff_global_expansion",1e-8);
     auto sweeps        = Read_sweeps (infile);
+
+    auto globExpanN         = input.getInt("globExpanN",std::numeric_limits<int>::max());
+    auto globExpanCutoff    = input.getReal("globExpanCutoff",1e-8);
+    auto globExpanDim       = input.getReal("globExpanDim",10);
+    auto globExpanMethod    = input.getString("globExpanMethod","DensityMatrix");  // Can be also "Fit"
+    auto globExpanKrylovDim = input.getInt("globExpanKrylovDim",3);
+    auto globExpanHpsiCutoff = input.getReal("globExpanHpsiCutoff",1e-8);
+    auto globExpanHpsiDim   = input.getInt("globExpanHpsiDim",10);
 
     auto UseSVD        = input.getYesNo("UseSVD",true);
     auto SVDmethod     = input.getString("SVDMethod","gesdd");  // can be also "ITensor"
@@ -205,23 +211,25 @@ int main(int argc, char* argv[])
     cout << sweeps << endl;
     psi.position(1);
     Real en, err;
-    Args args_tdvp_expansion = {"Cutoff",cutoff_global_expansion, "Method","DensityMatrix",
-                                "KrylovOrd",3, "DoNormalize",true, "Quiet",true};
+    Args args_tdvp_expansion = {"Cutoff",globExpanCutoff,"MaxDim",globExpanDim,"Method",globExpanMethod,
+                                "KrylovOrd",globExpanKrylovDim, "DoNormalize",true, "Quiet",true};
     for(int i = 0; i < time_steps; i++)
     {
         cout << "step = " << step << endl;
 
-        // Time evolution
-        if (cutoff_global_expansion != 0. and i < global_expansion_N)
+        // Global space expansion
+        if (globExpanCutoff != 0. and i < globExpanN)
         {
             timer["glob expan"].start();
             // Global subspace expansion
-            std::vector<Real> epsilonK = {1E-8, 1E-8};
-            addBasis (psi, H, epsilonK, args_tdvp_expansion);
+            std::vector<Real> cutoffK (globExpanKrylovDim-1, globExpanHpsiCutoff);
+            std::vector<int>  dimK (globExpanKrylovDim-1, globExpanHpsiDim);
+            addBasis (psi, H, cutoffK, dimK, args_tdvp_expansion);
             timer["glob expan"].stop();
         }
+        // Time evolution
         timer["tdvp"].start();
-        tdvp (psi, H, 1_i*dt, sweeps, obs, args_tdvp);
+        tdvp (psi, H, (0.1+1_i)*dt, sweeps, obs, args_tdvp);
         timer["tdvp"].stop();
         auto d1 = maxLinkDim(psi);
 

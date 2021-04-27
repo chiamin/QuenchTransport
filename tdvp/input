@@ -1,16 +1,22 @@
 basic
 {
     bias_leadL = 0
-    bias_device = 0.4
-    bias_leadR = 0.8
+    bias_device = 0.2
+    bias_leadR = 0.4
 
     dt = 1
     time_steps = 40
-    NumCenter = 1
+    NumCenter = 2
     Truncate = yes
     mixNumCenter = yes
-    global_expansion_N = 10000
-    cutoff_global_expansion = 1e-4
+
+    globExpanN          = 10000
+    globExpanKrylovDim  = 3
+    globExpanCutoff     = 1e-4
+    globExpanDim        = 300
+    globExpanMethod     = Fit
+    globExpanHpsiCutoff = 1e-4
+    globExpanHpsiDim    = 100
 
     SubCorrN = 1000
     corr_cutoff = 1e-12
@@ -33,6 +39,6 @@ basic
     sweeps
     {
         maxm   minm   cutoff   niter  noise    nsweep
-        300    8      1E-8     20     0        1
+        300    8      1E-5     20     0        1
     }
 }

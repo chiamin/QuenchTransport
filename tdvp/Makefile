@@ -18,7 +18,7 @@ MYDIR=$(HOME)/itensor.utility/
 MYDIR2=../dmrg/
 MYFLAGS=-I$(MYDIR) -I$(MYDIR)/latt -I$(MYDIR2) -fmax-errors=3 -Wno-unused-function -Wno-sign-compare -Wno-unused-variable
 
-HEADERS=$(MYDIR2)/MixedBasis.h MyObserver.h tdvp.h Corr.h SubCorr.h MeaCurrent.h MPOGen.h
+HEADERS=$(MYDIR2)/SystemStruct.h MyObserver.h tdvp.h Corr.h SubCorr.h MeaCurrent.h MPOGen.h
 
 # 5. For any additional .cc (source) files making up your project,
 #    add their full filenames here.
