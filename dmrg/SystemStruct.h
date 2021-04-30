@@ -294,8 +294,8 @@ WireSystem :: WireSystem (const Matrix& H0_L, const Matrix& H0_S, const Matrix& 
     // --- Find the order for the leads ---
     // Note: orbs[i]={segment,k,energy}, i is 0-index, k is 1-index
     //_orbs = sort_by_energy ({_parts.at("S"), _parts.at("L"), _parts.at("R")});
-    //_orbs = sort_by_energy_S_middle (_parts.at("S"), {_parts.at("L"), _parts.at("R")});
-    _orbs = sort_elec_hole_sep (_parts.at("L"), _parts.at("R"), _parts.at("S"), args.getBool("bias_lowL_highR"));
+    _orbs = sort_by_energy_S_middle (_parts.at("S"), {_parts.at("L"), _parts.at("R")});
+    //_orbs = sort_elec_hole_sep (_parts.at("L"), _parts.at("R"), _parts.at("S"), args.getBool("bias_lowL_highR"));
 
     update_order ();
 }
