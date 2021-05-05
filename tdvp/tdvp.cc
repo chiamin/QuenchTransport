@@ -212,7 +212,7 @@ int main(int argc, char* argv[])
     psi.position(1);
     Real en, err;
     Args args_tdvp_expansion = {"Cutoff",globExpanCutoff,"MaxDim",globExpanDim,"Method",globExpanMethod,
-                                "KrylovOrd",globExpanKrylovDim, "DoNormalize",true, "Quiet",true};
+                                "KrylovOrd",globExpanKrylovDim, "DoNormalize",true, "Quiet",false};
     for(int i = 0; i < time_steps; i++)
     {
         cout << "step = " << step << endl;
