@@ -56,17 +56,18 @@ def get_hop_t (fname):
 def get_data (fname):
     #dmrgdir = get_para (fname, 'input_dir', str)
     #dmrgfile = glob.glob ('../gs/*.out')[0]
-    L_lead = get_para (dmrgfile, 'L_lead', int)
-    L_device = get_para (dmrgfile, 'L_device', int)
+    L_lead = get_para (fname, 'L_lead', int)
+    L_device = get_para (fname, 'L_device', int)
     L = 2*L_lead + L_device
     Nstep = get_para (fname, 'step =', int, last=True)
     idevL, idevR = get_para (fname, 'device site', int, n=2)
-    hopt = get_hop_t (dmrgfile)
+    iC = get_para (fname, 'charge site', int)
+    hopt = get_hop_t (fname)
 
     Is = np.full ((Nstep,L), np.nan)
     Is_spec = np.full ((Nstep,L), np.nan)
-    ns = np.full ((Nstep,L), np.nan)
-    Ss = np.full ((Nstep,L), np.nan)
+    ns = np.full ((Nstep,L+1), np.nan)
+    Ss = np.full ((Nstep,L+1), np.nan)
     dims = np.full ((Nstep,L), np.nan)
     with open(fname) as f:
         for line in f:
@@ -85,7 +86,7 @@ def get_data (fname):
                     Is_spec[step-1,ilink-1] = I * cc
                 else:
                     Is[step-1,ilink-1] = I * cc
-            elif line.startswith('n '):
+            elif line.startswith('density '):
                 tmp = line.split()
                 i = int(tmp[1])
                 n = float(tmp[-1])
@@ -131,8 +132,6 @@ def get_basis_en (fname):
                     ens.append (float(tmp[-1]))
 
 if __name__ == '__main__':
-    dmrgfile = glob.glob ('../dmrg/out')[0]
-
     files = [i for i in sys.argv[1:] if i[0] != '-']
     fi,axi = pl.subplots()
     for fname in files:
@@ -147,17 +146,17 @@ if __name__ == '__main__':
         Nstep, L = np.shape(Is)
 
         # I profile
-        '''f,ax = pl.subplots()
-        plot_prof (ax, Is, dt, 'current')
+        f,ax = pl.subplots()
+        plot_prof (ax, Is_spec, dt, 'current')
         ax.set_title ('$m='+str(m)+'$')
         ps.set(ax)
 
-        f8,ax8 = pl.subplots()
+        '''f8,ax8 = pl.subplots()
         plot_time_slice (ax8, Is, n=3)
         ps.set(ax8)'''
 
         # n profile
-        '''f2,ax2 = pl.subplots()
+        f2,ax2 = pl.subplots()
         plot_prof (ax2, ns, dt, 'density')
         ax2.set_title ('$m='+str(m)+'$')
         ps.set(ax2)
@@ -167,10 +166,10 @@ if __name__ == '__main__':
         #ax.plot (range(1,len(en_basis)+1), en_basis)
         ax.set_xlabel ('energy')
         ax.set_ylabel ('occupasion')
-        ps.set(ax)'''
+        ps.set(ax)
 
         # S profile
-        '''f5,ax5 = pl.subplots()
+        f5,ax5 = pl.subplots()
         plot_prof (ax5, Ss, dt, 'entropy')
         ax5.set_title ('$m='+str(m)+'$')
         ps.set(ax5)
@@ -179,7 +178,7 @@ if __name__ == '__main__':
         plot_time_slice (ax6, Ss, n=3)
         ax6.set_xlabel ('site')
         ax6.set_ylabel ('entropy')
-        ps.set(ax6)'''
+        ps.set(ax6)
 
         f,ax = pl.subplots()
         plot_time_slice (ax, dims, n=5)
@@ -197,11 +196,11 @@ if __name__ == '__main__':
         ps.set(ax3)'''
 
         # current vs time
-        muL = get_para (fname, 'bias_leadL', float)
-        muR = get_para (fname, 'bias_leadL', float)
+        muL = get_para (fname, 'mu_biasL', float)
+        muR = get_para (fname, 'mu_biasR', float)
         Vb = muR - muL
-        Il = Is_spec[:, idevL-2] #/ Vb
-        Ir = Is_spec[:, idevR-1] #/ Vb
+        Il = Is_spec[:, idevL-2] / Vb
+        Ir = Is_spec[:, idevR-2] / Vb
         axi.plot (ts, Il, marker='.', label='left')
         axi.plot (ts, Ir, marker='.', label='right')
         #axi.plot (ts, Is[:, idevL-3] / Vb, marker='.', label='l2')

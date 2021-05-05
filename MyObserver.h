@@ -17,7 +17,6 @@ class MyObserver : public DMRGObserver
             _write = args.getBool ("Write",false);
             _write_minm = args.getInt ("out_minm",0);
             _out_dir = args.getString("out_dir",".");
-            _ConserveNf = args.getBool ("ConserveNf",true);
         }
 
         void measure (const Args& args = Args::global());
@@ -31,7 +30,6 @@ class MyObserver : public DMRGObserver
         int                  _write_minm;
         vector<int>          _iDel, _jDel;
         vector<Real>         _Delta;
-        bool                 _ConserveNf;
         SitesType            _sites;
 
         vector<Real>         _ns;

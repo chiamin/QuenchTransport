@@ -1,19 +1,18 @@
-#ifndef __MYOBSERVER_H_CMC__
-#define __MYOBSERVER_H_CMC__
+#ifndef __TDVPOBSERVER_H_CMC__
+#define __TDVPOBSERVER_H_CMC__
 #include <iomanip>
 #include <map>
 #include "itensor/all.h"
 #include "Entanglement.h"
-#include "MixedBasis.h"
-#include "Corr.h"
 #include "ContainerUtility.h"
 using namespace vectool;
 using namespace iutility;
 
-class MyObserver : public DMRGObserver
+template <typename SitesType>
+class TDVPObserver : public DMRGObserver
 {
     public:
-        MyObserver (const Fermion& sites, const MPS& psi, const Args& args=Args::global())
+        TDVPObserver (const SitesType& sites, const MPS& psi, const Args& args=Args::global())
         : DMRGObserver (psi, args)
         , _sites (sites)
         , _ns (length(psi),0.)
@@ -33,7 +32,7 @@ class MyObserver : public DMRGObserver
     private:
         bool                    _write;
         string                  _out_dir;	// empty string "" if not write
-        Fermion                 _sites;
+        SitesType               _sites;
 
         // Observables
         vector<Real>        _ns;
@@ -41,15 +40,8 @@ class MyObserver : public DMRGObserver
         vector<Spectrum>    _specs;
 };
 
-inline Real Onsite_mea (const ITensor& A, const ITensor& op)
-{
-    ITensor re = A * op;
-    re.noPrime ("Site");
-    re *= dag(A);
-    return toReal (re);
-}
-
-void MyObserver :: measure (const Args& args)
+template <typename SitesType>
+void TDVPObserver<SitesType> :: measure (const Args& args)
 {
     DMRGObserver::measure (args);
 
@@ -72,9 +64,10 @@ void MyObserver :: measure (const Args& args)
     if ((nc == 2 && oc == N) || ha == 2)
     {
         // Density
-        ITensor n_op = _sites.op("N",oc);
-        Real ni = Onsite_mea (psi().A(oc), n_op);
-        cout << "\tn " << oc << " = " << ni << endl;
+        ITensor n_op = noPrime (psi().A(oc) * _sites.op("N",oc), "Site");
+        n_op *= dag(psi().A(oc));
+        Real ni = toReal(n_op);
+        cout << "\tdensity " << oc << " = " << ni << endl;
         _ns.at(oc-1) = ni;
 
         // Entanglement entropy

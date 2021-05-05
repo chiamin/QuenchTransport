@@ -180,7 +180,6 @@ addBasisWorker(std::vector<MPS> const& psis,
 void addBasis(MPS& phi,
               const MPO& H,
               std::vector<Real> const& truncK,
-              std::vector<int> const& maxdimK,
               const Args& args0 = Args::global())
 	{
 	auto quiet = args0.getBool("Quiet",false);
@@ -194,7 +193,7 @@ void addBasis(MPS& phi,
 	cpu_time expand_time;
 	for(int i = 0; i < dk-1; ++i)
 		{
-		auto args1 = Args("Method=",method,"Cutoff=",truncK.at(i),"MaxDim=",maxdimK.at(i),"Nsweep=",nsw);
+		auto args1 = Args("Method=",method,"Cutoff=",truncK.at(i),"Nsweep=",nsw);
 		
 		if(i==0)
 			psis.at(i) = applyMPO(H,phi,args1);

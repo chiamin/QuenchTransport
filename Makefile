@@ -10,15 +10,15 @@ LIBRARY_DIR=$(HOME)/itensor
 #    set APP to 'myappname'. Running 'make' will compile the app.
 #    Running 'make debug' will make a program called 'myappname-g'
 #    which includes debugging symbols and can be used in gdb (Gnu debugger);
-APP=tdvp
+APP=dmrg
 
 # 4. Add any headers your program depends on here. The make program
 #    will auto-detect if these headers have changed and recompile your app.
 MYDIR=$(HOME)/itensor.utility/
-MYDIR2=../dmrg/
-MYFLAGS=-I$(MYDIR) -I$(MYDIR)/latt -I$(MYDIR2) -fmax-errors=3 -Wno-unused-function -Wno-sign-compare -Wno-unused-variable
 
-HEADERS=$(MYDIR2)/SystemStruct.h MyObserver.h tdvp.h Corr.h SubCorr.h MeaCurrent.h MPOGen.h
+MYFLAGS=-I$(MYDIR) -fmax-errors=3 -Wno-unused-variable -Wno-unused-function -Wno-sign-compare
+
+HEADERS=MyObserver.h MixedBasis.h SingleParticle.h SystemStruct.h SortBasis.h NonInterChain.h SpecialFermion.h tdvp.h TDVPObserver.h MeaCurrent.h basisextension.h
 
 # 5. For any additional .cc (source) files making up your project,
 #    add their full filenames here.

@@ -24,6 +24,28 @@ Mat<NumType> exact_corr (const MPS& psi)
     return corr;
 }
 
+template <typename SiteType, typename NumType>
+Mat<NumType> exact_corr2 (const MPS& psi)
+{
+    int N = length (psi);
+    auto sites = SiteType (siteInds(psi));
+    auto corr = Mat<NumType> (N,N);
+    for(int i = 1; i <= N; i++)
+    for(int j = 1; j <= N; j++)
+    {
+        auto phi = psi;
+        phi.ref(j) *= sites.op("C",j);
+        phi.ref(j).noPrime("Site");
+        phi.ref(i) *= sites.op("Cdag",i);
+        phi.ref(i).noPrime("Site");
+        if constexpr (is_same_v <NumType, Real>)
+            corr(i-1,j-1) = inner (psi, phi);
+        else
+            corr(i-1,j-1) = innerC (psi, phi);
+    }
+    return corr;
+}
+
 inline ITensor multSite (ITensor A, ITensor const& B)
 {
     A *= B;

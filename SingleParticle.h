@@ -8,7 +8,7 @@ inline int mix_ind (int xi, int yi, int Lx, int Ly, int first_index=1, int first
 
 Matrix Hamilt_k (int L, Real t, Real mu, Real damp_fac=1., bool damp_from_left=true, bool verbose=false)
 {
-cout << "L = " << L << endl;
+    cout << "L = " << L << endl;
     Matrix H (L,L);
     for(int i = 0; i < L; i++)
     {
