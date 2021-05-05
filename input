@@ -1,6 +1,6 @@
 basic
 {
-    L_lead = 200
+    L_lead = 10
     L_device = 7
     t_lead = 1
     t_device = 0.8
@@ -10,7 +10,6 @@ basic
     mu_leadR = 0
     mu_device = 0
     V_device = 0
-    damp_decay_length = 1e12
     N_particle = 1
 
     ConserveN = no
@@ -23,8 +22,10 @@ basic
     time_steps = 200
     NumCenter = 1
     mixNumCenter = yes
-    global_expansion_N = 100
-    cutoff_global_expansion = 1e-4
+    globExpanN = 100
+    globExpanCutoff = 1e-8
+    globExpanKrylovDim = 3
+    globExpanHpsiCutoff = 1e-8
     Truncate = yes
 
     SubCorrN = 1000
