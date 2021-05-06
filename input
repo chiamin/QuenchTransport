@@ -1,43 +1,40 @@
 basic
 {
-    L_lead = 10
-    L_device = 7
+    L_lead = 20
+    L_device = 4
     t_lead = 1
     t_device = 0.8
-    t_contactL = 0.25
-    t_contactR = 0.25
+    t_contactL = 0.5
+    t_contactR = 0.5
     mu_leadL = 0
     mu_leadR = 0
     mu_device = 0
-    V_device = 0
+    V_device = 1
     N_particle = 1
 
     ConserveN = no
     ConserveNs = yes
 
     mu_biasL = 0
-    mu_biasS = 0.2
+    mu_biasS = 0
     mu_biasR = 0.2
     dt = 1
-    time_steps = 200
+    time_steps = 10
     NumCenter = 1
     mixNumCenter = yes
-    globExpanN = 100
-    globExpanCutoff = 1e-8
-    globExpanKrylovDim = 3
+    globExpanN = 10
+    globExpanCutoff = 1e-6
+    globExpanKrylovDim = 2
     globExpanHpsiCutoff = 1e-8
     Truncate = yes
 
     SubCorrN = 1000
     corr_cutoff = 1e-12
 
-    reorder = no
-    cutoff_reorder = 1e-12
-
-    write = no
+    write = yes
     write_dir = .
     write_file = timeevol.save
-    read = no
+    read = yes
     read_dir = .
     read_file = timeevol.save
 

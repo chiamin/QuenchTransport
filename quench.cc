@@ -201,22 +201,26 @@ Mat<NumType> exact_corr2 (const MPS& psi, const WireSystem& sys)
 
 void writeAll (const string& filename,
                const MPS& psi, const MPO& H,
+               const WireSystem& system,
                int step)
 {
     ofstream ofs (filename);
     itensor::write (ofs, psi);
     itensor::write (ofs, H);
     itensor::write (ofs, step);
+    system.write (ofs);
 }
 
 void readAll (const string& filename,
               MPS& psi, MPO& H,
+              WireSystem& system,
               int& step)
 {
     ifstream ifs = open_file (filename);
     itensor::read (ifs, psi);
     itensor::read (ifs, H);
     itensor::read (ifs, step);
+    system.read (ifs);
 }
 
 int main(int argc, char* argv[])
@@ -264,52 +268,64 @@ int main(int argc, char* argv[])
     auto read_dir      = input.getString("read_dir",".");
     auto read_file     = input.getString("read_file","");
 
-    // Define basis
-    //Real damp_fac = exp(-1./damp_decay_length);
-    cout << "H left lead" << endl;
-    auto H_leadL = Hamilt_k (L_lead, t_lead, mu_leadL, 1., true, true);
-    cout << "H right lead" << endl;
-    auto H_leadR = Hamilt_k (L_lead, t_lead, mu_leadR, 1., true, true);
-    cout << "H dev" << endl;
-    auto H_dev   = Hamilt_k (L_device, t_device, mu_device, 1., true, true);
-    auto H_zero  = Matrix(1,1);
+    MPS psi;
+    MPO H;
+    auto system = WireSystem();
+    int step = 1;
+    auto sites = MixedBasis();
 
-    auto system = WireSystem ();
-    system.add_chain ("L",H_leadL);
-    system.add_chain ("R",H_leadR);
-    system.add_chain ("S",H_dev);
-    system.add_chain ("C",H_zero);
-    //system.sort_basis (sort_by_energy_S_middle (system.part("S"), {system.part("L"), system.part("R")}));
-    system.sort_basis (sort_by_energy_S_middle_charging (system.parts().at("S"), system.parts().at("C"), {system.parts().at("L"), system.parts().at("R")}));
-    system.add_hopping ("L","S",-1,1,t_contactL);
-    system.add_hopping ("R","S",1,-1,t_contactR);
-    system.set_V_charge (V_device);
-//    if (do_write)
-//        system.write (out_dir+"/"+out_Hamilt);
-    system.print_orbs();
-    cout << "device site = " << system.idevL() << " " << system.idevR() << endl;
-
-    // Make Hamiltonian MPO
-    int N = system.N();
-    //auto sites = Fermion (N, {"ConserveQNs",ConserveQNs,"ConserveNf",ConserveNf});
-    int charge_site = system.to_glob ("C",1);
-    // Find sites in S
-    vector<int> S_sites;
-    for(int i = 0; i < system.orbs().size(); i++)
+    if (!read)
     {
-        if (get<0>(system.orbs().at(i)) == "S")
-            S_sites.push_back (i+1);
+        // Define basis
+        //Real damp_fac = exp(-1./damp_decay_length);
+        cout << "H left lead" << endl;
+        auto H_leadL = Hamilt_k (L_lead, t_lead, mu_leadL, 1., true, true);
+        cout << "H right lead" << endl;
+        auto H_leadR = Hamilt_k (L_lead, t_lead, mu_leadR, 1., true, true);
+        cout << "H dev" << endl;
+        auto H_dev   = Hamilt_k (L_device, t_device, mu_device, 1., true, true);
+        auto H_zero  = Matrix(1,1);
+
+        system.add_chain ("L",H_leadL);
+        system.add_chain ("R",H_leadR);
+        system.add_chain ("S",H_dev);
+        system.add_chain ("C",H_zero);
+        //system.sort_basis (sort_by_energy_S_middle (system.part("S"), {system.part("L"), system.part("R")}));
+        system.sort_basis (sort_by_energy_S_middle_charging (system.parts().at("S"), system.parts().at("C"), {system.parts().at("L"), system.parts().at("R")}));
+        system.add_hopping ("L","S",-1,1,t_contactL);
+        system.add_hopping ("R","S",1,-1,t_contactR);
+        system.set_V_charge (V_device);
+    //    if (do_write)
+    //        system.write (out_dir+"/"+out_Hamilt);
+        system.print_orbs();
+        cout << "device site = " << system.idevL() << " " << system.idevR() << endl;
+
+        // Make Hamiltonian MPO
+        int N = system.N();
+        //auto sites = Fermion (N, {"ConserveQNs",ConserveQNs,"ConserveNf",ConserveNf});
+        int charge_site = system.to_glob ("C",1);
+        // Find sites in S
+        vector<int> S_sites;
+        for(int i = 0; i < system.orbs().size(); i++)
+        {
+            if (get<0>(system.orbs().at(i)) == "S")
+                S_sites.push_back (i+1);
+        }
+        sites = MixedBasis (N, S_sites, charge_site, {"MaxOcc",L_device,"ConserveN",ConserveN,"ConserveNs",ConserveNs});
+        cout << "charge site = " << charge_site << endl;
+        auto ampo = get_ampo (system, sites);
+        H = toMPO (ampo);
+        cout << "MPO dim = " << maxLinkDim(H) << endl;
+
+        // Initialze MPS
+        psi = get_ground_state (system, sites, mu_biasL, mu_biasS, mu_biasR);
+        psi.position(1);
     }
-    auto sites = MixedBasis (N, S_sites, charge_site, {"MaxOcc",L_device,"ConserveN",ConserveN,"ConserveNs",ConserveNs});
-    cout << "charge site = " << charge_site << endl;
-    auto ampo = get_ampo (system, sites);
-    auto H = toMPO (ampo);
-    cout << "MPO dim = " << maxLinkDim(H) << endl;
-
-    // Initialze MPS
-    MPS psi = get_ground_state (system, sites, mu_biasL, mu_biasS, mu_biasR);
-    psi.position(1);
-
+    else
+    {
+        readAll (read_dir+"/"+read_file, psi, H, system, step);
+        sites = MixedBasis (siteInds(psi));
+    }
 
     // ======================= Time evolution ========================
     // Args parameters
@@ -324,6 +340,7 @@ int main(int argc, char* argv[])
     vector<int> spec_links = {lenL, lenL+lenS};
     //for(int i = 1; i < system.N_phys(); i++)
     //    spec_links.push_back (i);
+    int N = system.N();
     vector<MPO> JMPOs (N);
     for(int i : spec_links)
     {
@@ -354,7 +371,6 @@ int main(int argc, char* argv[])
     Args args_tdvp_expansion = {"Cutoff",globExpanCutoff, "Method","DensityMatrix",
                                 "KrylovOrd",globExpanKrylovDim, "DoNormalize",true, "Quiet",true};
 
-    int step = 1;
     for(int i = 0; i < time_steps; i++)
     {
         cout << "step = " << step << endl;
@@ -396,7 +412,7 @@ int main(int argc, char* argv[])
         if (write)
         {
             timer["write"].start();
-            writeAll (write_dir+"/"+write_file, psi, H, step);
+            writeAll (write_dir+"/"+write_file, psi, H, system, step);
             timer["write"].stop();
         }
         step++;
