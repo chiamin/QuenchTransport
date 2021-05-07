@@ -371,12 +371,12 @@ int main(int argc, char* argv[])
     Args args_tdvp_expansion = {"Cutoff",globExpanCutoff, "Method","DensityMatrix",
                                 "KrylovOrd",globExpanKrylovDim, "DoNormalize",true, "Quiet",true};
 
-    for(int i = 0; i < time_steps; i++)
+    for(; step <= time_steps; step++)
     {
         cout << "step = " << step << endl;
 
         // Time evolution
-        if (i < globExpanN)
+        if (step < globExpanN)
         {
             timer["glob expan"].start();
             // Global subspace expansion
@@ -415,7 +415,6 @@ int main(int argc, char* argv[])
             writeAll (write_dir+"/"+write_file, psi, H, system, step);
             timer["write"].stop();
         }
-        step++;
     }
     timer.print();
     return 0;
