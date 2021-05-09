@@ -311,9 +311,9 @@ int main(int argc, char* argv[])
         }
         sites = MixedBasis (N, S_sites, charge_site, {"MaxOcc",L_device,"ConserveN",ConserveN,"ConserveNs",ConserveNs});
         cout << "charge site = " << charge_site << endl;
-        //auto ampo = get_ampo (system, sites);
-        //H = toMPO (ampo);
-        //cout << "MPO dim = " << maxLinkDim(H) << endl;
+        auto ampo = get_ampo (system, sites);
+        H = toMPO (ampo);
+        cout << "MPO dim = " << maxLinkDim(H) << endl;
 
         // Initialze MPS
         psi = get_ground_state (system, sites, mu_biasL, mu_biasS, mu_biasR);
