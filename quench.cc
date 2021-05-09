@@ -286,6 +286,7 @@ int main(int argc, char* argv[])
         auto H_dev   = Hamilt_k (L_device, t_device, mu_device, 1., true, true);
         auto H_zero  = Matrix(1,1);
 
+        // WireSystem
         system.add_chain ("L",H_leadL);
         system.add_chain ("R",H_leadR);
         system.add_chain ("S",H_dev);
@@ -295,9 +296,6 @@ int main(int argc, char* argv[])
         system.add_hopping ("L","S",-1,1,t_contactL);
         system.add_hopping ("R","S",1,-1,t_contactR);
         system.set_V_charge (V_device);
-    //    if (do_write)
-    //        system.write (out_dir+"/"+out_Hamilt);
-        system.print_orbs();
         cout << "device site = " << system.idevL() << " " << system.idevR() << endl;
 
         // Make Hamiltonian MPO
@@ -313,9 +311,9 @@ int main(int argc, char* argv[])
         }
         sites = MixedBasis (N, S_sites, charge_site, {"MaxOcc",L_device,"ConserveN",ConserveN,"ConserveNs",ConserveNs});
         cout << "charge site = " << charge_site << endl;
-        auto ampo = get_ampo (system, sites);
-        H = toMPO (ampo);
-        cout << "MPO dim = " << maxLinkDim(H) << endl;
+        //auto ampo = get_ampo (system, sites);
+        //H = toMPO (ampo);
+        //cout << "MPO dim = " << maxLinkDim(H) << endl;
 
         // Initialze MPS
         psi = get_ground_state (system, sites, mu_biasL, mu_biasS, mu_biasR);
@@ -326,7 +324,7 @@ int main(int argc, char* argv[])
         readAll (read_dir+"/"+read_file, psi, H, system, step);
         sites = MixedBasis (siteInds(psi));
     }
-
+    exit(0);
     // ======================= Time evolution ========================
     // Args parameters
     Args args_tdvp  = {"Quiet",true,"NumCenter",NumCenter,"DoNormalize",true,"Truncate",Truncate,

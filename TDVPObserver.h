@@ -61,7 +61,7 @@ void TDVPObserver<SitesType> :: measure (const Args& args)
     int oc = orthoCenter(psi());
     int nc = args.getInt("NumCenter");
     // measure during the second half of sweep
-    if ((nc == 2 && oc == N) || ha == 2)
+    if (oc == N || ha == 2)
     {
         // Density
         ITensor n_op = noPrime (psi().A(oc) * _sites.op("N",oc), "Site");

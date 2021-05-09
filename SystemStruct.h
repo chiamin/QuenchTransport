@@ -242,17 +242,16 @@ template <typename SiteType>
 MPS get_ground_state (const WireSystem& sys, const SiteType& sites, Real muL=0., Real muS=0., Real muR=0.)
 {
     mycheck (length(sites) == sys.N(), "size not match");
-    int Ns = 0;
+    int Ns=0, Np=0;
     Real E = 0.;
-    int Np = 0;
     vector<string> state (sys.N()+1, "Emp");
     for(string p : {"L","S","R"})
     {
         auto const& chain = sys.parts().at(p);
         Real mu;
-        if (p == "L") mu = muL;
-        else if (p == "S") mu = muS;
+        if (p == "L")      mu = muL;
         else if (p == "R") mu = muR;
+        else if (p == "S") mu = muS;
         for(int i = 1; i <= chain.L(); i++)
         {
             auto const& en = chain.ens()(i-1);
@@ -275,9 +274,13 @@ MPS get_ground_state (const WireSystem& sys, const SiteType& sites, Real muL=0.,
 
     InitState init (sites);
     for(int i = 1; i <= sys.N(); i++)
-    {
-        cout << "st " << i << " " << state.at(i) << endl;
         init.set (i, state.at(i));
+
+    cout << "orbitals, segment, ki, energy, state" << endl;
+    for(int i = 1; i <= sys.orbs().size(); i++)
+    {
+        auto [seg, ki, en] = sys.orbs().at(i-1);
+        cout << i << " " << seg << " " << ki << " " << en << " " << state.at(i) << endl;
     }
     cout << "initial energy = " << E << endl;
     cout << "initial particle number = " << Np << endl;
