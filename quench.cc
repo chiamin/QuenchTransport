@@ -324,7 +324,6 @@ int main(int argc, char* argv[])
         readAll (read_dir+"/"+read_file, psi, H, system, step);
         sites = MixedBasis (siteInds(psi));
     }
-    exit(0);
     // ======================= Time evolution ========================
     // Args parameters
     Args args_tdvp  = {"Quiet",true,"NumCenter",NumCenter,"DoNormalize",true,"Truncate",Truncate,
