@@ -241,6 +241,7 @@ int main(int argc, char* argv[])
     auto mu_biasL   = input.getReal("mu_biasL");
     auto mu_biasS   = input.getReal("mu_biasS");
     auto mu_biasR   = input.getReal("mu_biasR");
+    auto damp_decay_length = input.getInt("damp_decay_length",10000000);
 
     auto ConserveN   = input.getYesNo("ConserveN",false);
     auto ConserveNs  = input.getYesNo("ConserveNs",true);
@@ -255,6 +256,8 @@ int main(int argc, char* argv[])
     auto globExpanCutoff     = input.getReal("globExpanCutoff",1e-8);
     auto globExpanKrylovDim  = input.getInt("globExpanKrylovDim",3);
     auto globExpanHpsiCutoff = input.getReal("globExpanHpsiCutoff",1e-8);
+    auto globExpanHpsiMaxDim = input.getInt("globExpanHpsiMaxDim",300);
+    auto globExpanMethod     = input.getString("globExpanMethod","DensityMatrix");
     auto sweeps        = Read_sweeps (infile);
 
     auto UseSVD        = input.getYesNo("UseSVD",true);
@@ -277,13 +280,13 @@ int main(int argc, char* argv[])
     if (!read)
     {
         // Define basis
-        //Real damp_fac = exp(-1./damp_decay_length);
+        Real damp_fac = exp(-1./damp_decay_length);
         cout << "H left lead" << endl;
-        auto H_leadL = Hamilt_k (L_lead, t_lead, mu_leadL, 1., true, true);
+        auto H_leadL = Hamilt_k (L_lead, t_lead, mu_leadL, damp_fac, true, true);
         cout << "H right lead" << endl;
-        auto H_leadR = Hamilt_k (L_lead, t_lead, mu_leadR, 1., true, true);
+        auto H_leadR = Hamilt_k (L_lead, t_lead, mu_leadR, damp_fac, false, true);
         cout << "H dev" << endl;
-        auto H_dev   = Hamilt_k (L_device, t_device, mu_device, 1., true, true);
+        auto H_dev   = Hamilt_k (L_device, t_device, mu_device, damp_fac, true, true);
         auto H_zero  = Matrix(1,1);
 
         // WireSystem
@@ -377,8 +380,7 @@ int main(int argc, char* argv[])
         {
             timer["glob expan"].start();
             // Global subspace expansion
-            std::vector<Real> epsilonK (globExpanKrylovDim-1, globExpanHpsiCutoff);
-            addBasis (psi, H, epsilonK, args_tdvp_expansion);
+            addBasis (psi, H, globExpanHpsiCutoff, globExpanHpsiMaxDim, args_tdvp_expansion);
             timer["glob expan"].stop();
         }
         timer["tdvp"].start();

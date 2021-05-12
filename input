@@ -1,31 +1,33 @@
 basic
 {
-    L_lead = 20
-    L_device = 4
+    L_lead = 40
+    L_device = 2
     t_lead = 1
     t_device = 0.8
-    t_contactL = 0.5
-    t_contactR = 0.5
+    t_contactL = 0.1
+    t_contactR = 0.1
     mu_leadL = 0
     mu_leadR = 0
     mu_device = 0
-    V_device = 1
-    N_particle = 1
+    V_device = 0.2
+    damp_decay_lengthX = 20
 
-    ConserveN = no
+    ConserveN = yes
     ConserveNs = yes
 
     mu_biasL = 0
-    mu_biasS = 0
+    mu_biasS = 0.1
     mu_biasR = 0.2
     dt = 1
-    time_steps = 10
+    time_steps = 100
     NumCenter = 1
     mixNumCenter = yes
-    globExpanN = 10
-    globExpanCutoff = 1e-6
+    globExpanN = 100
+    globExpanCutoff = 1e-4
     globExpanKrylovDim = 2
-    globExpanHpsiCutoff = 1e-8
+    globExpanHpsiCutoff = 1e-10
+    globExpanHpsiMaxDim = 300
+    globExpanMethod = DensityMatrix
     Truncate = yes
 
     SubCorrN = 1000
@@ -34,7 +36,7 @@ basic
     write = yes
     write_dir = .
     write_file = timeevol.save
-    read = yes
+    read = no
     read_dir = .
     read_file = timeevol.save
 
