@@ -386,7 +386,7 @@ int main(int argc, char* argv[])
         // Time evolution
         timer["tdvp"].start();
         //tdvp (psi, H, 1_i*dt, sweeps, obs, args_tdvp);
-        TDVPWorker (psi, PH, 1_i*dt, sweeps, args_tdvp);
+        TDVPWorker (psi, PH, 1_i*dt, sweeps, obs, args_tdvp);
         timer["tdvp"].stop();
         auto d1 = maxLinkDim(psi);
 
