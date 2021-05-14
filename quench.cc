@@ -371,7 +371,7 @@ int main(int argc, char* argv[])
     Args args_tdvp  = {"Quiet",true,"NumCenter",NumCenter,"DoNormalize",true,"Truncate",Truncate,
                        "UseSVD",UseSVD,"SVDmethod",SVDmethod,"WriteDim",WriteDim,"mixNumCenter",mixNumCenter};
     LocalMPO PH (H, args_tdvp);
-    for(; step <= time_steps; step++)
+    while (step <= time_steps)
     {
         cout << "step = " << step << endl;
 
@@ -409,7 +409,7 @@ int main(int argc, char* argv[])
             timer["current mps"].stop();
             cout << "\t*current spec " << j << " " << j+1 << " = " << J << endl;
         }
-
+        step++;
         if (write)
         {
             timer["write"].start();
