@@ -3,26 +3,27 @@ basic
     L_lead = 40
     L_device = 2
     t_lead = 1
-    t_device = 0.8
+    t_device = 0.1
     t_contactL = 0.1
     t_contactR = 0.1
     mu_leadL = 0
     mu_leadR = 0
-    mu_device = 0
+    mu_device = -0.1
     V_device = 0.2
-    damp_decay_lengthX = 20
+    damp_decay_lengthX = 40
 
     ConserveN = yes
     ConserveNs = yes
 
-    mu_biasL = 0
-    mu_biasS = 0.1
-    mu_biasR = 0.2
+    mu_biasL = 0.2
+    mu_biasS = 0
+    mu_biasR = -0.2
     dt = 1
-    time_steps = 100
+    time_steps = 30
     NumCenter = 1
     mixNumCenter = yes
     globExpanN = 100
+    globExpanItv = 1
     globExpanCutoff = 1e-4
     globExpanKrylovDim = 2
     globExpanHpsiCutoff = 1e-10
@@ -48,6 +49,6 @@ basic
     sweeps
     {
         maxm   minm   cutoff   niter  noise    nsweep
-        64     8      1E-8     20     1e-8     1
+        64     16     1E-8     20     1e-8     1
     }
 }

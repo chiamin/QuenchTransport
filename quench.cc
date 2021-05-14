@@ -253,6 +253,7 @@ int main(int argc, char* argv[])
     auto Truncate      = input.getYesNo("Truncate");
     auto mixNumCenter  = input.getYesNo("mixNumCenter",false);
     auto globExpanN          = input.getInt("globExpanN",std::numeric_limits<int>::max());
+    auto globExpanItv        = input.getInt("globExpanItv",1);
     auto globExpanCutoff     = input.getReal("globExpanCutoff",1e-8);
     auto globExpanKrylovDim  = input.getInt("globExpanKrylovDim",3);
     auto globExpanHpsiCutoff = input.getReal("globExpanHpsiCutoff",1e-8);
@@ -328,9 +329,6 @@ int main(int argc, char* argv[])
         sites = MixedBasis (siteInds(psi));
     }
     // ======================= Time evolution ========================
-    // Args parameters
-    Args args_tdvp  = {"Quiet",true,"NumCenter",NumCenter,"DoNormalize",true,"Truncate",Truncate,
-                       "UseSVD",UseSVD,"SVDmethod",SVDmethod,"WriteDim",WriteDim,"mixNumCenter",mixNumCenter};
 
     // Observer
     auto obs = TDVPObserver (sites, psi);
@@ -370,21 +368,25 @@ int main(int argc, char* argv[])
     Real en, err;
     Args args_tdvp_expansion = {"Cutoff",globExpanCutoff, "Method","DensityMatrix",
                                 "KrylovOrd",globExpanKrylovDim, "DoNormalize",true, "Quiet",true};
-
+    Args args_tdvp  = {"Quiet",true,"NumCenter",NumCenter,"DoNormalize",true,"Truncate",Truncate,
+                       "UseSVD",UseSVD,"SVDmethod",SVDmethod,"WriteDim",WriteDim,"mixNumCenter",mixNumCenter};
+    LocalMPO PH (H, args_tdvp);
     for(; step <= time_steps; step++)
     {
         cout << "step = " << step << endl;
 
-        // Time evolution
-        if (step < globExpanN)
+        // Subspace expansion
+        if (maxLinkDim(psi) < sweeps.mindim(1) or (step < globExpanN and (step-1) % globExpanItv == 0))
         {
             timer["glob expan"].start();
-            // Global subspace expansion
             addBasis (psi, H, globExpanHpsiCutoff, globExpanHpsiMaxDim, args_tdvp_expansion);
+            PH.reset();
             timer["glob expan"].stop();
         }
+        // Time evolution
         timer["tdvp"].start();
-        tdvp (psi, H, 1_i*dt, sweeps, obs, args_tdvp);
+        //tdvp (psi, H, 1_i*dt, sweeps, obs, args_tdvp);
+        TDVPWorker (psi, PH, 1_i*dt, sweeps, args_tdvp);
         timer["tdvp"].stop();
         auto d1 = maxLinkDim(psi);
 
