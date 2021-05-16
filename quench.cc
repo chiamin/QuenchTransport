@@ -237,7 +237,9 @@ int main(int argc, char* argv[])
     auto mu_leadL   = input.getReal("mu_leadL");
     auto mu_leadR   = input.getReal("mu_leadR");
     auto mu_device  = input.getReal("mu_device");
-    auto V_device   = input.getReal("V_device");
+    auto Delta      = input.getReal("Delta");
+    auto Ec         = input.getReal("Ec");
+    auto Ng         = input.getReal("Ng");
     auto mu_biasL   = input.getReal("mu_biasL");
     auto mu_biasS   = input.getReal("mu_biasS");
     auto mu_biasR   = input.getReal("mu_biasR");
@@ -259,7 +261,8 @@ int main(int argc, char* argv[])
     auto globExpanHpsiCutoff = input.getReal("globExpanHpsiCutoff",1e-8);
     auto globExpanHpsiMaxDim = input.getInt("globExpanHpsiMaxDim",300);
     auto globExpanMethod     = input.getString("globExpanMethod","DensityMatrix");
-    auto sweeps        = Read_sweeps (infile);
+    auto sweeps_t      = Read_sweeps (infile, "time_evolution_sweeps");
+    auto sweeps_dmrg   = Read_sweeps (infile, "DMRG_sweeps");
 
     auto UseSVD        = input.getYesNo("UseSVD",true);
     auto SVDmethod     = input.getString("SVDMethod","gesdd");  // can be also "ITensor"
@@ -299,10 +302,11 @@ int main(int argc, char* argv[])
         system.sort_basis (sort_by_energy_S_middle_charging (system.parts().at("S"), system.parts().at("C"), {system.parts().at("L"), system.parts().at("R")}));
         system.add_hopping ("L","S",-1,1,t_contactL);
         system.add_hopping ("R","S",1,-1,t_contactR);
-        system.set_V_charge (V_device);
+        system.set_Ec (Ec, Ng);
+        system.add_SC ("S", Delta);
         cout << "device site = " << system.idevL() << " " << system.idevR() << endl;
 
-        // Make Hamiltonian MPO
+        // Define SiteSet
         int N = system.N();
         //auto sites = Fermion (N, {"ConserveQNs",ConserveQNs,"ConserveNf",ConserveNf});
         int charge_site = system.to_glob ("C",1);
@@ -315,13 +319,25 @@ int main(int argc, char* argv[])
         }
         sites = MixedBasis (N, S_sites, charge_site, {"MaxOcc",L_device,"ConserveN",ConserveN,"ConserveNs",ConserveNs});
         cout << "charge site = " << charge_site << endl;
-        auto ampo = get_ampo (system, sites);
-        H = toMPO (ampo);
-        cout << "MPO dim = " << maxLinkDim(H) << endl;
 
         // Initialze MPS
         psi = get_ground_state (system, sites, mu_biasL, mu_biasS, mu_biasR);
         psi.position(1);
+
+        // Get ground state
+        {
+            auto ampo = get_ampo (system, sites, false);
+            auto H0 = toMPO (ampo);
+            // DMRG
+            MyObserver<decltype(sites)> myobs (sites, psi);
+            dmrg (psi, H0, sweeps_dmrg, myobs, {"WriteDim",WriteDim});
+            cout << "Initial state dim = " << maxLinkDim(psi) << endl;
+        }
+
+        // Make Hamiltonian MPO
+        auto ampo = get_ampo (system, sites);
+        H = toMPO (ampo);
+        cout << "MPO dim = " << maxLinkDim(H) << endl;
     }
     else
     {
@@ -363,7 +379,7 @@ int main(int argc, char* argv[])
 
     // Time evolution
     cout << "Start time evolution" << endl;
-    cout << sweeps << endl;
+    cout << sweeps_t << endl;
     psi.position(1);
     Real en, err;
     Args args_tdvp_expansion = {"Cutoff",globExpanCutoff, "Method","DensityMatrix",
@@ -376,7 +392,7 @@ int main(int argc, char* argv[])
         cout << "step = " << step << endl;
 
         // Subspace expansion
-        if (maxLinkDim(psi) < sweeps.mindim(1) or (step < globExpanN and (step-1) % globExpanItv == 0))
+        if (maxLinkDim(psi) < sweeps_t.mindim(1) or (step < globExpanN and (step-1) % globExpanItv == 0))
         {
             timer["glob expan"].start();
             addBasis (psi, H, globExpanHpsiCutoff, globExpanHpsiMaxDim, args_tdvp_expansion);
@@ -386,7 +402,7 @@ int main(int argc, char* argv[])
         // Time evolution
         timer["tdvp"].start();
         //tdvp (psi, H, 1_i*dt, sweeps, obs, args_tdvp);
-        TDVPWorker (psi, PH, 1_i*dt, sweeps, obs, args_tdvp);
+        TDVPWorker (psi, PH, 1_i*dt, sweeps_t, obs, args_tdvp);
         timer["tdvp"].stop();
         auto d1 = maxLinkDim(psi);
 

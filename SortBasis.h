@@ -50,7 +50,7 @@ sort_by_energy_S_middle_charging
     for(; it != orbs.end(); it++)
     {
         auto [seg,i,en] = *it;
-        if (seg == "S" and en > 0.) break;
+        if (seg == "S") break;
     }
     orbs.insert (it, orb_C.begin(), orb_C.end());
     return orbs;

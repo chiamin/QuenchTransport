@@ -7,6 +7,7 @@ import numpy as np
 import fitfun as ff
 import matplotlib.colors as colors
 import cmasher as cmr
+import fitfun as ff
 
 def exactG (V, tp):
     if V != 0:
@@ -111,25 +112,39 @@ def plot_prof (ax, data, dt, label=''):
     ax.set_ylabel ('time')
     cb.ax.set_ylabel (label)
 
-def plot_time_slice (ax, data, n, xs=[], **args):
+def plot_time_slice (ax, data, n, xs=[], label='', **args):
     Nstep, L = np.shape(data)
     itv = Nstep // n
     if xs == []:
         xs = range(1,L+1)
     for d in data[::itv,:]:
-        ax.plot (xs, d, marker='.', **args)
-    ax.plot (xs, data[-1,:], marker='.', **args)
+        ax.plot (xs, d, **args)
+    ax.plot (xs, data[-1,:], label=label, **args)
 
-def get_basis_en (fname):
-    ens = []
+def get_basis (fname):
+    ens, segs = [],[]
     with open(fname) as f:
         for line in f:
             if 'orbitals, segment, ki, energy' in line:
                 for line in f:
                     tmp = line.split()
                     if not tmp[0].isdigit():
-                        return ens
-                    ens.append (float(tmp[-1]))
+                        return np.array(ens), np.array(segs)
+                    ens.append (float(tmp[3]))
+                    segs.append (tmp[1])
+
+def extrap_current (ts, Il, Ir, plot=False):
+    n = 100
+    ts = np.reciprocal(ts)[-n:]
+    Il = Il[-n:]
+    Ir = Ir[-n:]
+    if plot:
+        f,ax = pl.subplots()
+        ax.plot (ts, Il, marker='.', ls='None', label='left')
+        ax.plot (ts, Ir, marker='.', ls='None', label='right')
+        fitx, fity, stddev, fit = ff.myfit (ts, Il, order=1, ax=ax, refit=True)
+        fitx, fity, stddev, fit = ff.myfit (ts, Ir, order=1, ax=ax, refit=True)
+
 
 if __name__ == '__main__':
     files = [i for i in sys.argv[1:] if i[0] != '-']
@@ -137,7 +152,7 @@ if __name__ == '__main__':
     for fname in files:
         print (fname)
 
-        en_basis = get_basis_en (fname)
+        en_basis, segs = get_basis (fname)
 
         # Get data
         Is, Is_spec, ns, Ss, dims = get_data (fname)
@@ -146,30 +161,56 @@ if __name__ == '__main__':
         Nstep, L = np.shape(Is)
 
         # I profile
-        f,ax = pl.subplots()
+        '''f,ax = pl.subplots()
         plot_prof (ax, Is_spec, dt, 'current')
         ax.set_title ('$m='+str(m)+'$')
         ps.set(ax)
 
-        '''f8,ax8 = pl.subplots()
+        f8,ax8 = pl.subplots()
         plot_time_slice (ax8, Is, n=3)
         ps.set(ax8)'''
 
         # n profile
-        f2,ax2 = pl.subplots()
+        '''f2,ax2 = pl.subplots()
         plot_prof (ax2, ns, dt, 'density')
         ax2.set_title ('$m='+str(m)+'$')
-        ps.set(ax2)
+        ps.set(ax2)'''
 
         f,ax = pl.subplots()
-        plot_time_slice (ax, ns, n=5, xs=en_basis, ls='None')
+        ii = segs == 'L'
+        plot_time_slice (ax, ns[:,ii], n=5, marker='.', ls='None', label='L', xs=en_basis[ii])
+        ii = segs == 'R'
+        plot_time_slice (ax, ns[:,ii], n=5, marker='x', ls='None', label='R', xs=en_basis[ii])
+        ii = segs == 'S'
+        plot_time_slice (ax, ns[:,ii], n=5, marker='+', ls='None', label='S', xs=en_basis[ii])
+        for x in np.where (ii)[0]:
+            ax.axvline (en_basis[x], ls='--', c='gray', alpha=0.5)
+        ii = segs == 'C'
+        plot_time_slice (ax, ns[:,ii], n=5, marker='*', ls='None', label='C', xs=en_basis[ii])
         #ax.plot (range(1,len(en_basis)+1), en_basis)
         ax.set_xlabel ('energy')
         ax.set_ylabel ('occupasion')
+        ax.legend()
+        ps.set(ax)
+
+        f,ax = pl.subplots()
+        sites = np.array(range(1,L+2))
+        ii = segs == 'L'
+        plot_time_slice (ax, ns[:,ii], n=5, marker='.', ls='None', label='L', xs=sites[ii])
+        ii = segs == 'R'
+        plot_time_slice (ax, ns[:,ii], n=5, marker='x', ls='None', label='R', xs=sites[ii])
+        ii = segs == 'S'
+        plot_time_slice (ax, ns[:,ii], n=5, marker='+', ls='None', label='S', xs=sites[ii])
+        ii = segs == 'C'
+        plot_time_slice (ax, ns[:,ii], n=5, marker='*', ls='None', label='C', xs=sites[ii])
+        #ax.plot (range(1,len(en_basis)+1), en_basis)
+        ax.set_xlabel ('site')
+        ax.set_ylabel ('occupasion')
+        ax.legend()
         ps.set(ax)
 
         # S profile
-        f5,ax5 = pl.subplots()
+        '''f5,ax5 = pl.subplots()
         plot_prof (ax5, Ss, dt, 'entropy')
         ax5.set_title ('$m='+str(m)+'$')
         ps.set(ax5)
@@ -178,7 +219,7 @@ if __name__ == '__main__':
         plot_time_slice (ax6, Ss, n=3)
         ax6.set_xlabel ('site')
         ax6.set_ylabel ('entropy')
-        ps.set(ax6)
+        ps.set(ax6)'''
 
         f,ax = pl.subplots()
         plot_time_slice (ax, dims, n=5)
@@ -201,10 +242,11 @@ if __name__ == '__main__':
         Vb = muR - muL
         Il = Is_spec[:, idevL-2] / Vb
         Ir = Is_spec[:, idevR-2] / Vb
-        axi.plot (ts, Il, marker='.', label='left')
-        axi.plot (ts, Ir, marker='.', label='right')
+        axi.plot (ts, Il, label='left')
+        axi.plot (ts, Ir, label='right')
         #axi.plot (ts, Is[:, idevL-3] / Vb, marker='.', label='l2')
         #axi.plot (ts, Is[:, idevL] / Vb, marker='.', label='r2')
+        #extrap_current (ts, Il, Ir, plot=True)
         axi.set_xlabel ('time')
         axi.set_ylabel ('conductance')
         axi.legend()
@@ -215,5 +257,9 @@ if __name__ == '__main__':
         axi.axhline (-exactG(0, tp), ls='--', c='gray')'''
 
         ps.set(axi)
+
+        if '-pdf' in sys.argv:
+            filename = fname.replace('.out','_I.pdf')
+            fi.savefig (filename)
 
     pl.show()

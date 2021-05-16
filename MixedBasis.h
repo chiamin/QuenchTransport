@@ -106,6 +106,13 @@ class SpecialBosonSite
                 Op.set(s=n,sP=1+n,1);
             }
         }
+        else if(opname == "I")
+        {
+            for(auto n : range1(1+maxOcc))
+            {
+                Op.set(s=n,sP=n,1);
+            }
+        }
         else
         {
             throw ITError("Operator \"" + opname + "\" name not recognized");

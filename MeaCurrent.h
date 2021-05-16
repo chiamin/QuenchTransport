@@ -17,6 +17,17 @@ MPO get_current_mpo (const SiteType& sites, const WireSystem& sys, int i, Real c
     return mpo;
 }
 
+template <typename SiteType>
+MPO get_current_N_mpo (const SiteType& sites, const WireSystem& sys, int i, Real cutoff=1e-18)
+{
+    auto [partL, i1] = get_loc (sys, i);
+    auto [partR, i2] = get_loc (sys, i+1);
+    AutoMPO ampo (sites);
+    add_CdagC (ampo, sys, partL, partR, i1, i2, 1.);
+    auto mpo = toMPO (ampo);
+    return mpo;
+}
+
 Real get_current (const MPO& JMPO, const MPS& psi)
 {
     auto J = innerC (psi, JMPO, psi);

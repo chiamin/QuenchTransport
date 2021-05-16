@@ -11,7 +11,33 @@
 #include "NonInterChain.h"
 #include "SortBasis.h"
 #include "ContainerUtility.h"
+#include "GeneralUtility.h"
 using namespace std;
+
+template <typename T>
+vector<tuple<T,int,int>>
+quadratic_term_coefs (const NonInterChain& chain1, const NonInterChain& chain2, int i1, int i2, bool dag1, bool dag2)
+{
+    vector<tuple<T,int,int>> ops12;
+    auto uik1 = chain1.Ui(i1);
+    auto uik2 = chain2.Ui(i2);
+    for(int ki1 = 0; ki1 < uik1.size(); ki1++)
+    {
+        auto u1 = uik1 (ki1);
+        if constexpr (is_same_v <decltype(u1), Cplx>)
+            if (dag1)
+                u1 = std::conj(u1);
+        for(int ki2 = 0; ki2 < uik2.size(); ki2++)
+        {
+            auto u2 = uik2 (ki2);
+            if constexpr (is_same_v <decltype(u2), Cplx>)
+                if (dag2)
+                    u2 = std::conj(u2);
+            ops12.emplace_back (u1*u2,ki1+1,ki2+1);     // Cdag_ki1 C_ki2
+        }
+    }
+    return ops12;
+}
 
 // Return: Term of coef * Cdag_1 C_2 where 1, 2 are in chain1 and chain2
 template <typename T>
@@ -40,10 +66,12 @@ class WireSystem
     public:
         WireSystem () {}
 
-        void  add_chain    (const string& name, const Matrix& H0);
-        void  add_mu       (const string& part, Real mu);
-        void  add_hopping  (const string& p1, const string& p2, int i1, int i2, Real t);
-        void  set_V_charge (Real V) { _V_charge = V; }
+        void  add_chain    (const string& name, const Matrix& H0)   { _parts.emplace (name, NonInterChain (H0, name)); }
+        void  add_mu       (const string& part, Real mu)            { _parts.at(part).add_mu (mu); }
+        void  add_hopping  (const string& p1, const string& p2, int i1, int i2, Real t)
+                                                                    { _hops.emplace_back (p1, p2, i1, i2, -t); }
+        void  set_Ec       (Real Ec, Real Ng)                       { _Ec = Ec; _Ng = Ng; }
+        void  add_SC       (const string& p, Real Delta)            { _SC.emplace_back (p, Delta); }
 
         int   N       () const;
         int   N_phys  () const { return has_part("C") ? N()-1 : N(); }
@@ -61,8 +89,10 @@ class WireSystem
         bool        has_part   (const string& p)           const { return _parts.count(p) != 0; }
         const auto& orbs       ()                          const { return _orbs; }
         const auto& hops       ()                          const { return _hops; }
-        Real        V          ()                          const { return _V_charge; }
+        Real        Ec         ()                          const { return _Ec; }
+        Real        Ng         ()                          const { return _Ng; }
         void        print_orbs ()                          const;
+        const auto& SC         ()                          const { return _SC; }
 
         void write (ostream& s) const;
         void read  (istream& s);
@@ -75,20 +105,16 @@ class WireSystem
     private:
         using GlobOrbDict = unordered_map <string, vector<int>>;
 
-        unordered_map <string, NonInterChain>   _parts;
-        vector<BasisInfo>           _orbs;
-        GlobOrbDict                 _to_glob;           // {partition, ki} -> ortical index
-        vector<pair<string,int>>    _to_local;          // ortical index -> {partition, ki}
+        unordered_map <string, NonInterChain>     _parts;
+        vector<BasisInfo>                         _orbs;
+        GlobOrbDict                               _to_glob;           // {partition, ki} -> ortical index
+        vector<pair<string,int>>                  _to_local;          // ortical index -> {partition, ki}
         vector<tuple<string,string,int,int,Real>> _hops;
-        Real _V_charge;
+        Real                                      _Ec, _Ng;
+        vector<pair<string,Real>>                 _SC;
 
         void update_order ();
 };
-
-void WireSystem :: add_chain (const string& name, const Matrix& H0)
-{
-    _parts.emplace (name, NonInterChain (H0, name));
-}
 
 template <typename SortFunction, typename... FuncArgs>
 void WireSystem :: sort_basis (SortFunction sort_func, FuncArgs... args)
@@ -148,16 +174,6 @@ void WireSystem :: update_order ()
     }
 }
 
-void WireSystem :: add_hopping (const string& p1, const string& p2, int i1, int i2, Real t)
-{
-    _hops.emplace_back (p1, p2, i1, i2, -t);
-}
-
-void WireSystem :: add_mu (const string& part, Real mu)
-{
-    _parts.at(part).add_mu (mu);
-}
-
 template <typename NumType>
 void add_CdagC (AutoMPO& ampo, const WireSystem& sys, const string& p1, const string& p2, int i1, int i2, NumType coef)
 {
@@ -165,10 +181,10 @@ void add_CdagC (AutoMPO& ampo, const WireSystem& sys, const string& p1, const st
     const auto& chain2 = sys.parts().at(p2);
     if (i1 < 0) i1 += chain1.L()+1;
     if (i2 < 0) i2 += chain2.L()+1;
-    auto terms = CdagC_terms (chain1, chain2, i1, i2, coef);
+    auto terms = quadratic_term_coefs<Real> (chain1, chain2, i1, i2, true, false);
 
     // 
-    bool has_charging = sys.has_part("C");   // charging energy
+    bool has_charging = sys.has_part("C");  // charging energy
     int jc = (has_charging ? sys.to_glob ("C",1) : -1);
     string op_charge = "";
     if (has_charging)
@@ -186,20 +202,40 @@ void add_CdagC (AutoMPO& ampo, const WireSystem& sys, const string& p1, const st
         }
     }
     // Hopping terms
-    for(auto [coef, op1, i1, op2, i2] : terms)
+    for(auto [c12, k1, k2] : terms)
     {
-        int j1 = sys.to_glob (p1,i1);
-        int j2 = sys.to_glob (p2,i2);
+        int j1 = sys.to_glob (p1,k1);
+        int j2 = sys.to_glob (p2,k2);
         // hopping
         if (op_charge != "")
         {
 //cout << "* " << coef << " " << op1 << " " << j1 << " " << op_charge << " " << jc << " " << op2 << " " << j2 << endl;
-            ampo += coef, op1, j1, op_charge, jc, op2, j2;
+            ampo += coef*c12, "Cdag", j1, op_charge, jc, "C", j2;
         }
         else
         {
-            ampo += coef, op1, j1, op2, j2;
+            ampo += coef*c12, "Cdag", j1, "C", j2;
         }
+    }
+}
+
+template <typename NumType>
+void add_SC (AutoMPO& ampo, const WireSystem& sys, const string& p1, const string& p2, int i1, int i2, NumType coef)
+{
+    const auto& chain1 = sys.parts().at(p1);
+    const auto& chain2 = sys.parts().at(p2);
+    if (i1 < 0) i1 += chain1.L()+1;
+    if (i2 < 0) i2 += chain2.L()+1;
+    auto terms = quadratic_term_coefs<Real> (chain1, chain2, i1, i2, false, false);
+
+    for(auto [c12, k1, k2] : terms)
+    {
+        int j1 = sys.to_glob (p1,k1);
+        int j2 = sys.to_glob (p2,k2);
+        auto c = coef * c12;
+        auto cc = iutility::conjT (c);
+        ampo += -c, "C", j1, "C", j2;
+        ampo += -cc, "Cdag", j2, "Cdag", j1;
     }
 }
 
@@ -213,7 +249,7 @@ void add_diag (AutoMPO& ampo, const WireSystem& sys, const string& p, const NonI
 }
 
 template <typename SiteType>
-AutoMPO get_ampo (const WireSystem& sys, const SiteType& sites)
+AutoMPO get_ampo (const WireSystem& sys, const SiteType& sites, bool hopping=true)
 {
     mycheck (length(sites) == sys.N(), "size not match");
 
@@ -222,18 +258,32 @@ AutoMPO get_ampo (const WireSystem& sys, const SiteType& sites)
     for(auto const& [p, chain] : sys.parts())
         add_diag (ampo, sys, p, chain);
     // Hopping terms
-    for(auto const& [p1,p2,i1,i2,coef] : sys.hops())
+    if (hopping)
     {
-        add_CdagC (ampo, sys, p1, p2, i1, i2, coef);
-        add_CdagC (ampo, sys, p2, p1, i2, i1, coef);
+        for(auto const& [p1,p2,i1,i2,coef] : sys.hops())
+        {
+            add_CdagC (ampo, sys, p1, p2, i1, i2, coef);
+            add_CdagC (ampo, sys, p2, p1, i2, i1, coef);
+        }
     }
     // charging energy
     if (sys.has_part("C"))
     {
         int jc = sys.to_glob ("C",1);
-        ampo +=  0.5*sys.V(),"NSqr",jc;
-        ampo += -0.5*sys.V(),"N",jc;
-//cout << "** " << sys.V() << " " << jc << endl;
+        /*ampo += sys.Ec(),"NSqr",jc;
+        ampo += sys.Ec()*sys.Ng()*sys.Ng(),"I",jc;
+        ampo += -2.*sys.Ec()*sys.Ng(),"N",jc;*/
+        ampo +=  0.5*sys.Ec(),"NSqr",jc;
+        ampo += -0.5*sys.Ec(),"N",jc;
+    }
+    // superconducting
+    for(auto [p, Delta] : sys.SC())
+    {
+        auto const& chain = sys.parts().at(p);
+        for(int i = 1; i < chain.L(); i++)
+        {
+            add_SC (ampo, sys, p, p, i, i+1, Delta);
+        }
     }
     return ampo;
 }
@@ -312,7 +362,8 @@ void WireSystem :: write (ostream& s) const
     iutility::write(s,_to_glob);
     iutility::write(s,_to_local);
     iutility::write(s,_hops);
-    iutility::write(s,_V_charge);
+    iutility::write(s,_Ec);
+    iutility::write(s,_SC);
 }
 
 void WireSystem :: read (istream& s)
@@ -322,7 +373,8 @@ void WireSystem :: read (istream& s)
     iutility::read(s,_to_glob);
     iutility::read(s,_to_local);
     iutility::read(s,_hops);
-    iutility::read(s,_V_charge);
+    iutility::read(s,_Ec);
+    iutility::read(s,_SC);
 }
 
 void WireSystem :: write (const string& fname) const

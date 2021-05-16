@@ -70,7 +70,7 @@ void MyObserver<SitesType> :: measure (const Args& args)
 
         // Entanglement entropy
         Real S = EntangEntropy (spectrum());
-        cout << "\tentang entropy " << oc << " = " << S << endl;
+        cout << "\tDMRG entang entropy " << oc << " = " << S << endl;
     }
 
     if (oc == 1 && ha == 2)

@@ -9,24 +9,26 @@ basic
     mu_leadL = 0
     mu_leadR = 0
     mu_device = -0.1
-    V_device = 0.2
+    Delta = 1
+    Ec = 1
+    Ng = 0
     damp_decay_lengthX = 40
 
-    ConserveN = yes
-    ConserveNs = yes
+    ConserveN = no
+    ConserveNs = no
 
     mu_biasL = 0.2
     mu_biasS = 0
     mu_biasR = -0.2
     dt = 1
-    time_steps = 30
+    time_steps = 40
     NumCenter = 1
     mixNumCenter = yes
     globExpanN = 100
     globExpanItv = 1
     globExpanCutoff = 1e-4
     globExpanKrylovDim = 2
-    globExpanHpsiCutoff = 1e-10
+    globExpanHpsiCutoff = 1e-12
     globExpanHpsiMaxDim = 300
     globExpanMethod = DensityMatrix
     Truncate = yes
@@ -46,9 +48,20 @@ basic
     SVDMethod = gesdd
 
     WriteDim = 2000
-    sweeps
+    DMRG_sweeps
+    {
+        maxm   cutoff   niter  noise    nsweep
+        16     1E-12    10     1e-6     4
+        32     1E-12    10     1e-8     4
+        64     1E-12    10     1e-9     4
+        128    1E-12    10     0        4
+        200    1E-12    10     0        3
+        300    1E-12    10     0        3
+    }
+
+    time_evolution_sweeps
     {
         maxm   minm   cutoff   niter  noise    nsweep
-        64     16     1E-8     20     1e-8     1
+        128    16     1E-9     20     1e-8     1
     }
 }
