@@ -270,11 +270,11 @@ AutoMPO get_ampo (const WireSystem& sys, const SiteType& sites, bool hopping=tru
     if (sys.has_part("C"))
     {
         int jc = sys.to_glob ("C",1);
-        /*ampo += sys.Ec(),"NSqr",jc;
+        ampo += sys.Ec(),"NSqr",jc;
         ampo += sys.Ec()*sys.Ng()*sys.Ng(),"I",jc;
-        ampo += -2.*sys.Ec()*sys.Ng(),"N",jc;*/
-        ampo +=  0.5*sys.Ec(),"NSqr",jc;
-        ampo += -0.5*sys.Ec(),"N",jc;
+        ampo += -2.*sys.Ec()*sys.Ng(),"N",jc;
+        //ampo +=  0.5*sys.Ec(),"NSqr",jc;
+        //ampo += -0.5*sys.Ec(),"N",jc;
     }
     // superconducting
     for(auto [p, Delta] : sys.SC())
