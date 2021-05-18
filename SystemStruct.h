@@ -289,7 +289,7 @@ AutoMPO get_ampo (const WireSystem& sys, const SiteType& sites, bool hopping=tru
 }
 
 template <typename SiteType>
-MPS get_ground_state (const WireSystem& sys, const SiteType& sites, Real muL=0., Real muS=0., Real muR=0.)
+MPS get_ground_state (const WireSystem& sys, const SiteType& sites, Real muL=0., Real muS=0., Real muR=0., int NS=0)
 {
     mycheck (length(sites) == sys.N(), "size not match");
     int Ns=0, Np=0;
@@ -306,13 +306,22 @@ MPS get_ground_state (const WireSystem& sys, const SiteType& sites, Real muL=0.,
         {
             auto const& en = chain.ens()(i-1);
             int j = sys.to_glob (p, i);
-            if (en-mu < 0.)
+
+            if (p == "S")
+            {
+                if (Ns < NS)
+                {
+                    state.at(j) = "Occ";
+                    E += en;
+                    Np++;
+                    Ns++;
+                }
+            }
+            else if (en-mu < 0.)
             {
                 state.at(j) = "Occ";
                 E += en;
                 Np++;
-                if (p == "S")
-                    Ns++;
             }
         }
     }

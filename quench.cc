@@ -244,6 +244,7 @@ int main(int argc, char* argv[])
     auto mu_biasS   = input.getReal("mu_biasS");
     auto mu_biasR   = input.getReal("mu_biasR");
     auto damp_decay_length = input.getInt("damp_decay_length",10000000);
+    auto N_device   = input.getReal("N_device",0);
 
     auto ConserveN   = input.getYesNo("ConserveN",false);
     auto ConserveNs  = input.getYesNo("ConserveNs",true);
@@ -321,7 +322,7 @@ int main(int argc, char* argv[])
         cout << "charge site = " << charge_site << endl;
 
         // Initialze MPS
-        psi = get_ground_state (system, sites, mu_biasL, mu_biasS, mu_biasR);
+        psi = get_ground_state (system, sites, mu_biasL, mu_biasS, mu_biasR, N_device);
         psi.position(1);
 
         // Get ground state
@@ -332,6 +333,11 @@ int main(int argc, char* argv[])
             MyObserver<decltype(sites)> myobs (sites, psi);
             dmrg (psi, H0, sweeps_dmrg, myobs, {"WriteDim",WriteDim});
             cout << "Initial state dim = " << maxLinkDim(psi) << endl;
+            //
+            int iC = system.to_glob ("C",1);
+            Real nC = den (sites, psi, iC);
+            cout << "Initial Nc = " << nC << endl;
+exit(0);
         }
 
         // Make Hamiltonian MPO
