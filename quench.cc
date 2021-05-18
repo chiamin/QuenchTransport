@@ -244,7 +244,7 @@ int main(int argc, char* argv[])
     auto mu_biasS   = input.getReal("mu_biasS");
     auto mu_biasR   = input.getReal("mu_biasR");
     auto damp_decay_length = input.getInt("damp_decay_length",10000000);
-    auto N_device   = input.getReal("N_device",0);
+    auto N_device_init = input.getReal("N_device_init",0);
 
     auto ConserveN   = input.getYesNo("ConserveN",false);
     auto ConserveNs  = input.getYesNo("ConserveNs",true);
@@ -322,7 +322,7 @@ int main(int argc, char* argv[])
         cout << "charge site = " << charge_site << endl;
 
         // Initialze MPS
-        psi = get_ground_state (system, sites, mu_biasL, mu_biasS, mu_biasR, N_device);
+        psi = get_ground_state (system, sites, mu_biasL, mu_biasS, mu_biasR, N_device_init);
         psi.position(1);
 
         // Get ground state

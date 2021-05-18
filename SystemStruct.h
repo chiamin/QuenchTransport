@@ -302,7 +302,7 @@ MPS get_ground_state (const WireSystem& sys, const SiteType& sites, Real muL=0.,
         if (p == "L")      mu = muL;
         else if (p == "R") mu = muR;
         else if (p == "S") mu = muS;
-        for(int i = 1; i <= chain.L(); i++)
+        for(int i = chain.L(); i >= 1; i--)
         {
             auto const& en = chain.ens()(i-1);
             int j = sys.to_glob (p, i);
