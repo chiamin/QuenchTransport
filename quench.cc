@@ -244,7 +244,6 @@ int main(int argc, char* argv[])
     auto mu_biasS   = input.getReal("mu_biasS");
     auto mu_biasR   = input.getReal("mu_biasR");
     auto damp_decay_length = input.getInt("damp_decay_length",10000000);
-    auto N_device_init = input.getReal("N_device_init",0);
 
     auto ConserveN   = input.getYesNo("ConserveN",false);
     auto ConserveNs  = input.getYesNo("ConserveNs",true);
@@ -321,22 +320,34 @@ int main(int argc, char* argv[])
         sites = MixedBasis (N, S_sites, charge_site, {"MaxOcc",L_device,"ConserveN",ConserveN,"ConserveNs",ConserveNs});
         cout << "charge site = " << charge_site << endl;
 
-        // Initialze MPS
-        psi = get_ground_state (system, sites, mu_biasL, mu_biasS, mu_biasR, N_device_init);
-        psi.position(1);
-
         // Get ground state
         {
+            auto psi0 = get_ground_state (system, sites, mu_biasL, mu_biasS, mu_biasR, 0);
+            auto psi1 = get_ground_state (system, sites, mu_biasL, mu_biasS, mu_biasR, 1);
+            psi0.position(1);
+            psi1.position(1);
+
             auto ampo = get_ampo (system, sites, false);
             auto H0 = toMPO (ampo);
             // DMRG
-            MyObserver<decltype(sites)> myobs (sites, psi);
-            dmrg (psi, H0, sweeps_dmrg, myobs, {"WriteDim",WriteDim});
+            MyObserver<decltype(sites)> myobs0 (sites, psi0);
+            MyObserver<decltype(sites)> myobs1 (sites, psi1);
+            Real en0 = dmrg (psi0, H0, sweeps_dmrg, myobs0, {"WriteDim",WriteDim});
+            Real en1 = dmrg (psi1, H0, sweeps_dmrg, myobs1, {"WriteDim",WriteDim});
+            psi = (en0 < en1 ? psi0 : psi1);
             cout << "Initial state dim = " << maxLinkDim(psi) << endl;
-            //
+            // Print density
             int iC = system.to_glob ("C",1);
             Real nC = den (sites, psi, iC);
             cout << "Initial Nc = " << nC << endl;
+
+            Real Np = 0.;
+            for(int i = 1; i <= length(psi); i++)
+            {
+                if (i != iC)
+                    Np += den (sites, psi, i);
+            }
+            cout << "Initial Np = " << Np << endl;
         }
 
         // Make Hamiltonian MPO
