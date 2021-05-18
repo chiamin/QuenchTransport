@@ -337,7 +337,6 @@ int main(int argc, char* argv[])
             int iC = system.to_glob ("C",1);
             Real nC = den (sites, psi, iC);
             cout << "Initial Nc = " << nC << endl;
-exit(0);
         }
 
         // Make Hamiltonian MPO
