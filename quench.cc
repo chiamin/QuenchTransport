@@ -247,7 +247,7 @@ int main(int argc, char* argv[])
 
     auto ConserveN   = input.getYesNo("ConserveN",false);
     auto ConserveNs  = input.getYesNo("ConserveNs",true);
-
+    auto conserveQN  = input.getYesNo("conserveQN",true);
 
     auto dt            = input.getReal("dt");
     auto time_steps    = input.getInt("time_steps");
@@ -308,7 +308,6 @@ int main(int argc, char* argv[])
 
         // Define SiteSet
         int N = system.N();
-        //auto sites = Fermion (N, {"ConserveQNs",ConserveQNs,"ConserveNf",ConserveNf});
         int charge_site = system.to_glob ("C",1);
         // Find sites in S
         vector<int> S_sites;
@@ -317,7 +316,8 @@ int main(int argc, char* argv[])
             if (get<0>(system.orbs().at(i)) == "S")
                 S_sites.push_back (i+1);
         }
-        sites = MixedBasis (N, S_sites, charge_site, {"MaxOcc",L_device,"ConserveN",ConserveN,"ConserveNs",ConserveNs});
+        sites = MixedBasis (N, S_sites, charge_site,
+                            {"MaxOcc",L_device,"ConserveN",ConserveN,"ConserveNs",ConserveNs,"conserveQN",conserveQN});
         cout << "charge site = " << charge_site << endl;
 
         // Get ground state

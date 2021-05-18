@@ -16,6 +16,7 @@ class SpecialBosonSite
     {
         auto conserveNb = args.getBool("ConserveN",true);
         auto conserveNs = args.getBool("ConserveNs",true);
+        auto conserveQN = args.getBool("conserveQN",true);
 
         auto tags = TagSet("Site,Boson");
         auto n = 1;
@@ -44,8 +45,10 @@ class SpecialBosonSite
                     int p = n % 2;
                     if (conserveNs)
                         qints[n] = QNInt(QN({"Pf",0,-2},{"Ns",-n,-1}),1);
-                    else
+                    else if (conserveQN)
                         qints[n] = QNInt(QN({"Pf",0,-2},{"Ps",p,-2}),1);
+                    else
+                        qints[n] = QNInt(QN({"Ps",p,-2}),1);
                 }
                 s = Index(std::move(qints),Out,tags);
             }

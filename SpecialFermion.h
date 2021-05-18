@@ -22,6 +22,7 @@ class SpecialFermionSite
         }
         auto conserve_Nf = args.getBool("ConserveN",true);
         auto conserve_Ns = args.getBool("ConserveNs",true);
+        auto conserve_QN = args.getBool("conserveQN",true);
         {
             if (conserve_Nf) //usual case
             {
@@ -46,9 +47,13 @@ class SpecialFermionSite
                         s = Index(QN({"Pf",0,-2},{"Ns",0,-1}),1,
                                   QN({"Pf",1,-2},{"Ns",1,-1}),1,
                                   Out,ts);
-                    else
+                    else if (conserve_QN)
                         s = Index(QN({"Pf",0,-2},{"Ps",0,-2}),1,
                                   QN({"Pf",1,-2},{"Ps",1,-2}),1,
+                                  Out,ts);
+                    else
+                        s = Index(QN({"Ps",0,-2}),1,
+                                  QN({"Ps",1,-2}),1,
                                   Out,ts);
                 }
                 else
@@ -57,9 +62,13 @@ class SpecialFermionSite
                         s = Index(QN({"Pf",0,-2},{"Ns",0,-1}),1,
                                   QN({"Pf",1,-2},{"Ns",0,-1}),1,
                                   Out,ts);
-                    else
+                    else if (conserve_QN)
                         s = Index(QN({"Pf",0,-2},{"Ps",0,-2}),1,
                                   QN({"Pf",1,-2},{"Ps",0,-2}),1,
+                                  Out,ts);
+                    else
+                        s = Index(QN({"Ps",0,-2}),1,
+                                  QN({"Ps",0,-2}),1,
                                   Out,ts);
                 }
             }
