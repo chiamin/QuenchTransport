@@ -138,7 +138,16 @@ Real den (const SiteSet& sites, const MPS& psi, int i)
 {
     AutoMPO ampo (sites);
     ampo += 1.,"N",i;
-    return inner(psi,ampo,psi);
+    auto n = toMPO (ampo);
+    return inner(psi,n,psi);
+}
+
+Real den (const SiteSet& sites, const MPS& psi, int i1, int i2)
+{
+    Real n = 0.;
+    for(int i = i1; i <= i2; i++)
+        n += den (sites, psi, i);
+    return n;
 }
 
 template <typename MPSType>
@@ -328,26 +337,56 @@ int main(int argc, char* argv[])
             psi1.position(1);
 
             auto ampo = get_ampo (system, sites, false);
+            for(int i = 1; i <= length(sites); i++)
+            {
+                auto [p,j] = system.to_loc (i);
+                if (p == "L")
+                    ampo += -mu_biasL,"N",i;
+                else if (p == "R")
+                    ampo += -mu_biasR,"N",i;
+                else if (p == "S")
+                    ampo += -mu_biasS,"N",i;
+            }
             auto H0 = toMPO (ampo);
             // DMRG
             MyObserver<decltype(sites)> myobs0 (sites, psi0);
             MyObserver<decltype(sites)> myobs1 (sites, psi1);
             Real en0 = dmrg (psi0, H0, sweeps_dmrg, myobs0, {"WriteDim",WriteDim});
             Real en1 = dmrg (psi1, H0, sweeps_dmrg, myobs1, {"WriteDim",WriteDim});
-            psi = (en0 < en1 ? psi0 : psi1);
+            if (abs(en0-en1) < 1e-10)
+            {
+                psi = sum (psi0, psi1);
+                psi.normalize();
+            }
+            else
+            {
+                psi = (en0 < en1 ? psi0 : psi1);
+            }
             cout << "Initial state dim = " << maxLinkDim(psi) << endl;
             // Print density
             int iC = system.to_glob ("C",1);
             Real nC = den (sites, psi, iC);
             cout << "Initial Nc = " << nC << endl;
 
-            Real Np = 0.;
+            Real Np=0., Ns=0., Ns0=0., Ns1=0.;
             for(int i = 1; i <= length(psi); i++)
             {
                 if (i != iC)
+                {
                     Np += den (sites, psi, i);
+                }
+                auto [p,j] = system.to_loc (i);
+                if (p == "S")
+                {
+                    Ns  += den (sites, psi, i);
+                    Ns0 += den (sites, psi0, i);
+                    Ns1 += den (sites, psi1, i);
+                }
             }
             cout << "Initial Np = " << Np << endl;
+cout << "en " << en0 << " " << en1 << endl;
+cout << "Np " << Ns0 << " " << Ns1 << " " << Ns << endl;
+//exit(0);
         }
 
         // Make Hamiltonian MPO
