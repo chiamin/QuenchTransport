@@ -335,7 +335,7 @@ int main(int argc, char* argv[])
 
     cout << "<Ht> = " << inner (psi, H, psi) << endl;
     // Observer
-    auto obs = TDVPObserver (sites, psi);
+    auto obs = TDVPObserver (sites, psi, {"charge_site",system.to_glob ("C",1)});
     // Current MPO
     int lenL = system.parts().at("L").L();
     int lenS = system.parts().at("S").L();
@@ -406,13 +406,15 @@ int main(int argc, char* argv[])
             cout << "\t*current " << j << " " << j+1 << " = " << J << endl;
         }*/
         // Measure currents by MPO
+        cout << "\t*current spec" << endl;
         for(int j : spec_links)
         {
             timer["current mps"].start();
             auto J = get_current (JMPOs.at(j), psi);
             timer["current mps"].stop();
-            cout << "\t*current spec " << j << " " << j+1 << " = " << J << endl;
+            cout << "\t\t" << j << " " << j+1 << " " << J << endl;
         }
+        cout << "\tend" << endl;
         step++;
         if (write)
         {

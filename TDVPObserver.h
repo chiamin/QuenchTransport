@@ -21,6 +21,7 @@ class TDVPObserver : public DMRGObserver
         {
             _write = args.getBool ("Write",false);
             _out_dir = args.getString("out_dir",".");
+            _charge_site = args.getInt("charge_site",-1);
         }
 
         void measure (const Args& args);
@@ -30,9 +31,10 @@ class TDVPObserver : public DMRGObserver
         const Spectrum& spec (int i) const { return _specs.at(i); }
 
     private:
-        bool                    _write;
-        string                  _out_dir;	// empty string "" if not write
-        SitesType               _sites;
+        bool        _write;
+        string      _out_dir;	// empty string "" if not write
+        SitesType   _sites;
+        int         _charge_site=-1;
 
         // Observables
         vector<Real>        _ns;
@@ -67,21 +69,33 @@ void TDVPObserver<SitesType> :: measure (const Args& args)
         ITensor n_op = noPrime (psi().A(oc) * _sites.op("N",oc), "Site");
         n_op *= dag(psi().A(oc));
         Real ni = real(eltC(n_op));
-        cout << "\tdensity " << oc << " = " << ni << endl;
+        cout << "\t*den " << oc << " " << ni << endl;
         _ns.at(oc-1) = ni;
 
         // Entanglement entropy
         Real S = EntangEntropy (spectrum());
-        cout << "\tentang entropy " << oc << " = " << S << endl;
+        cout << "\t*ent S " << oc << " " << S << endl;
+
+        if (oc == _charge_site)
+        {
+            auto denmat = psi()(oc) * dag(prime(psi()(oc),"Site"));
+            denmat.takeReal();
+            auto [Q,D] = diagHermitian (denmat);
+            auto ii = denmat.inds()(1);
+            cout << "\tspecial charge site:" << endl;
+            for(int i = 1; i <= dim(ii); i++)
+                cout << "\t\t" << elt (denmat,i,i) << " " << elt(D,i,i) << endl;
+            cout << "\tend" << endl;
+        }
     }
 
     // At the end of a sweep
     if (oc == 1 && ha == 2 && b == 1)
     {
+        cout << "\tbond dim:" << endl;
         for(int i = 1; i < N; i++)
-        {
-            cout << "\tbond dim " << i << " = " << dim(rightLinkIndex (psi(), i)) << endl;
-        }
+            cout << "\t\t" << i << " " << dim(rightLinkIndex (psi(), i)) << endl;
+        cout << "\tend" << endl;
 
         if (_write)
         {
