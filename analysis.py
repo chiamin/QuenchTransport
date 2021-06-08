@@ -259,7 +259,7 @@ if __name__ == '__main__':
         ps.set(axi)
 
         if '-pdf' in sys.argv:
-            filename = fname.replace('.out','_I.pdf')
+            filename = fname.replace('.out','')+'_I.pdf'
             fi.savefig (filename)
 
     pl.show()

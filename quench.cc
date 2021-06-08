@@ -138,16 +138,7 @@ Real den (const SiteSet& sites, const MPS& psi, int i)
 {
     AutoMPO ampo (sites);
     ampo += 1.,"N",i;
-    auto n = toMPO (ampo);
-    return inner(psi,n,psi);
-}
-
-Real den (const SiteSet& sites, const MPS& psi, int i1, int i2)
-{
-    Real n = 0.;
-    for(int i = i1; i <= i2; i++)
-        n += den (sites, psi, i);
-    return n;
+    return inner(psi,ampo,psi);
 }
 
 template <typename MPSType>
@@ -246,13 +237,13 @@ int main(int argc, char* argv[])
     auto mu_leadL   = input.getReal("mu_leadL");
     auto mu_leadR   = input.getReal("mu_leadR");
     auto mu_device  = input.getReal("mu_device");
-    auto Delta      = input.getReal("Delta");
-    auto Ec         = input.getReal("Ec");
-    auto Ng         = input.getReal("Ng");
+    auto V_device   = input.getReal("V_device");
     auto mu_biasL   = input.getReal("mu_biasL");
     auto mu_biasS   = input.getReal("mu_biasS");
     auto mu_biasR   = input.getReal("mu_biasR");
+    auto Delta      = input.getReal("Delta");
     auto damp_decay_length = input.getInt("damp_decay_length",10000000);
+    auto maxCharge  = input.getInt("maxCharge");
 
     auto ConserveN   = input.getYesNo("ConserveN",false);
     auto ConserveNs  = input.getYesNo("ConserveNs",true);
@@ -270,8 +261,7 @@ int main(int argc, char* argv[])
     auto globExpanHpsiCutoff = input.getReal("globExpanHpsiCutoff",1e-8);
     auto globExpanHpsiMaxDim = input.getInt("globExpanHpsiMaxDim",300);
     auto globExpanMethod     = input.getString("globExpanMethod","DensityMatrix");
-    auto sweeps_t      = Read_sweeps (infile, "time_evolution_sweeps");
-    auto sweeps_dmrg   = Read_sweeps (infile, "DMRG_sweeps");
+    auto sweeps        = Read_sweeps (infile);
 
     auto UseSVD        = input.getYesNo("UseSVD",true);
     auto SVDmethod     = input.getString("SVDMethod","gesdd");  // can be also "ITensor"
@@ -311,12 +301,12 @@ int main(int argc, char* argv[])
         system.sort_basis (sort_by_energy_S_middle_charging (system.parts().at("S"), system.parts().at("C"), {system.parts().at("L"), system.parts().at("R")}));
         system.add_hopping ("L","S",-1,1,t_contactL);
         system.add_hopping ("R","S",1,-1,t_contactR);
-        system.set_Ec (Ec, Ng);
-        system.add_SC ("S", Delta);
+        system.set_V_charge (V_device);
         cout << "device site = " << system.idevL() << " " << system.idevR() << endl;
 
-        // Define SiteSet
+        // Make Hamiltonian MPO
         int N = system.N();
+        //auto sites = Fermion (N, {"ConserveQNs",ConserveQNs,"ConserveNf",ConserveNf});
         int charge_site = system.to_glob ("C",1);
         // Find sites in S
         vector<int> S_sites;
@@ -325,74 +315,16 @@ int main(int argc, char* argv[])
             if (get<0>(system.orbs().at(i)) == "S")
                 S_sites.push_back (i+1);
         }
-        sites = MixedBasis (N, S_sites, charge_site,
-                            {"MaxOcc",L_device,"ConserveN",ConserveN,"ConserveNs",ConserveNs,"conserveQN",conserveQN});
+        Args args_basis = {"MaxOcc",maxCharge,"ConserveN",ConserveN,"ConserveNs",ConserveNs,"conserveQN",conserveQN};
+        sites = MixedBasis (N, S_sites, charge_site, args_basis);
         cout << "charge site = " << charge_site << endl;
-
-        // Get ground state
-        {
-            auto psi0 = get_ground_state (system, sites, mu_biasL, mu_biasS, mu_biasR, 0);
-            auto psi1 = get_ground_state (system, sites, mu_biasL, mu_biasS, mu_biasR, 1);
-            psi0.position(1);
-            psi1.position(1);
-
-            auto ampo = get_ampo (system, sites, false);
-            for(int i = 1; i <= length(sites); i++)
-            {
-                auto [p,j] = system.to_loc (i);
-                if (p == "L")
-                    ampo += -mu_biasL,"N",i;
-                else if (p == "R")
-                    ampo += -mu_biasR,"N",i;
-                else if (p == "S")
-                    ampo += -mu_biasS,"N",i;
-            }
-            auto H0 = toMPO (ampo);
-            // DMRG
-            MyObserver<decltype(sites)> myobs0 (sites, psi0);
-            MyObserver<decltype(sites)> myobs1 (sites, psi1);
-            Real en0 = dmrg (psi0, H0, sweeps_dmrg, myobs0, {"WriteDim",WriteDim});
-            Real en1 = dmrg (psi1, H0, sweeps_dmrg, myobs1, {"WriteDim",WriteDim});
-            if (abs(en0-en1) < 1e-10)
-            {
-                psi = sum (psi0, psi1);
-                psi.normalize();
-            }
-            else
-            {
-                psi = (en0 < en1 ? psi0 : psi1);
-            }
-            cout << "Initial state dim = " << maxLinkDim(psi) << endl;
-            // Print density
-            int iC = system.to_glob ("C",1);
-            Real nC = den (sites, psi, iC);
-            cout << "Initial Nc = " << nC << endl;
-
-            Real Np=0., Ns=0., Ns0=0., Ns1=0.;
-            for(int i = 1; i <= length(psi); i++)
-            {
-                if (i != iC)
-                {
-                    Np += den (sites, psi, i);
-                }
-                auto [p,j] = system.to_loc (i);
-                if (p == "S")
-                {
-                    Ns  += den (sites, psi, i);
-                    Ns0 += den (sites, psi0, i);
-                    Ns1 += den (sites, psi1, i);
-                }
-            }
-            cout << "Initial Np = " << Np << endl;
-cout << "en " << en0 << " " << en1 << endl;
-cout << "Np " << Ns0 << " " << Ns1 << " " << Ns << endl;
-//exit(0);
-        }
-
-        // Make Hamiltonian MPO
         auto ampo = get_ampo (system, sites);
         H = toMPO (ampo);
         cout << "MPO dim = " << maxLinkDim(H) << endl;
+
+        // Initialze MPS
+        psi = get_ground_state (system, sites, mu_biasL, mu_biasS, mu_biasR);
+        psi.position(1);
     }
     else
     {
@@ -401,6 +333,7 @@ cout << "Np " << Ns0 << " " << Ns1 << " " << Ns << endl;
     }
     // ======================= Time evolution ========================
 
+    cout << "<Ht> = " << inner (psi, H, psi) << endl;
     // Observer
     auto obs = TDVPObserver (sites, psi);
     // Current MPO
@@ -434,7 +367,7 @@ cout << "Np " << Ns0 << " " << Ns1 << " " << Ns << endl;
 
     // Time evolution
     cout << "Start time evolution" << endl;
-    cout << sweeps_t << endl;
+    cout << sweeps << endl;
     psi.position(1);
     Real en, err;
     Args args_tdvp_expansion = {"Cutoff",globExpanCutoff, "Method","DensityMatrix",
@@ -447,7 +380,7 @@ cout << "Np " << Ns0 << " " << Ns1 << " " << Ns << endl;
         cout << "step = " << step << endl;
 
         // Subspace expansion
-        if (maxLinkDim(psi) < sweeps_t.mindim(1) or (step < globExpanN and (step-1) % globExpanItv == 0))
+        if (maxLinkDim(psi) < sweeps.mindim(1) or (step < globExpanN and (step-1) % globExpanItv == 0))
         {
             timer["glob expan"].start();
             addBasis (psi, H, globExpanHpsiCutoff, globExpanHpsiMaxDim, args_tdvp_expansion);
@@ -457,7 +390,7 @@ cout << "Np " << Ns0 << " " << Ns1 << " " << Ns << endl;
         // Time evolution
         timer["tdvp"].start();
         //tdvp (psi, H, 1_i*dt, sweeps, obs, args_tdvp);
-        TDVPWorker (psi, PH, 1_i*dt, sweeps_t, obs, args_tdvp);
+        TDVPWorker (psi, PH, 1_i*dt, sweeps, obs, args_tdvp);
         timer["tdvp"].stop();
         auto d1 = maxLinkDim(psi);
 

@@ -11,7 +11,7 @@ class SpecialFermionSite
 
     SpecialFermionSite(Index I) : s(I) { }
 
-    SpecialFermionSite(bool special_qn, Args const& args = Args::global())
+    SpecialFermionSite(Args const& args = Args::global())
     {
         auto ts = TagSet("Site,Fermion");
         auto n = 1;
@@ -23,6 +23,7 @@ class SpecialFermionSite
         auto conserve_Nf = args.getBool("ConserveN",true);
         auto conserve_Ns = args.getBool("ConserveNs",true);
         auto conserve_QN = args.getBool("conserveQN",true);
+        auto special_qn = args.getBool("special_qn",false);
         {
             if (conserve_Nf) //usual case
             {
@@ -158,4 +159,6 @@ class SpecialFermionSite
         return Op;
         }
 };
+
+using SpecialFermion = BasicSiteSet<SpecialFermionSite>;
 #endif

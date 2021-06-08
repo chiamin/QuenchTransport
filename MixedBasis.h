@@ -140,7 +140,7 @@ class MixedBasis : public SiteSet
         {
             bool special_qn = (j >= iL and j <= iR);
             if(j == iC) sites.set (j,SpecialBosonSite   ({args,"SiteNumber=",j}));
-            else        sites.set (j,SpecialFermionSite (special_qn, {args,"SiteNumber=",j}));
+            else        sites.set (j,SpecialFermionSite ({args,"SiteNumber=",j,"special_qn",special_qn}));
         }
         SiteSet::init(std::move(sites));
     }
@@ -152,7 +152,7 @@ class MixedBasis : public SiteSet
         {
             bool special_qn = vectool::in_vector (C_sites, j);
             if(j == iC) sites.set (j,SpecialBosonSite   ({args,"SiteNumber=",j}));
-            else        sites.set (j,SpecialFermionSite (special_qn, {args,"SiteNumber=",j}));
+            else        sites.set (j,SpecialFermionSite ({args,"SiteNumber=",j,"special_qn",special_qn}));
         }
         SiteSet::init(std::move(sites));
     }

@@ -11,7 +11,6 @@
 #include "NonInterChain.h"
 #include "SortBasis.h"
 #include "ContainerUtility.h"
-#include "GeneralUtility.h"
 using namespace std;
 
 template <typename T>
@@ -24,15 +23,13 @@ quadratic_term_coefs (const NonInterChain& chain1, const NonInterChain& chain2, 
     for(int ki1 = 0; ki1 < uik1.size(); ki1++)
     {
         auto u1 = uik1 (ki1);
-        if constexpr (is_same_v <decltype(u1), Cplx>)
-            if (dag1)
-                u1 = std::conj(u1);
+        if (dag1)
+            u1 = iutility::conjT (u1);
         for(int ki2 = 0; ki2 < uik2.size(); ki2++)
         {
             auto u2 = uik2 (ki2);
-            if constexpr (is_same_v <decltype(u2), Cplx>)
-                if (dag2)
-                    u2 = std::conj(u2);
+            if (dag2)
+                u2 = iutility::conjT (u2);
             ops12.emplace_back (u1*u2,ki1+1,ki2+1);     // Cdag_ki1 C_ki2
         }
     }
@@ -66,12 +63,10 @@ class WireSystem
     public:
         WireSystem () {}
 
-        void  add_chain    (const string& name, const Matrix& H0)   { _parts.emplace (name, NonInterChain (H0, name)); }
-        void  add_mu       (const string& part, Real mu)            { _parts.at(part).add_mu (mu); }
-        void  add_hopping  (const string& p1, const string& p2, int i1, int i2, Real t)
-                                                                    { _hops.emplace_back (p1, p2, i1, i2, -t); }
-        void  set_Ec       (Real Ec, Real Ng)                       { _Ec = Ec; _Ng = Ng; }
-        void  add_SC       (const string& p, Real Delta)            { _SC.emplace_back (p, Delta); }
+        void  add_chain    (const string& name, const Matrix& H0);
+        void  add_mu       (const string& part, Real mu);
+        void  add_hopping  (const string& p1, const string& p2, int i1, int i2, Real t);
+        void  set_V_charge (Real V) { _V_charge = V; }
 
         int   N       () const;
         int   N_phys  () const { return has_part("C") ? N()-1 : N(); }
@@ -89,10 +84,8 @@ class WireSystem
         bool        has_part   (const string& p)           const { return _parts.count(p) != 0; }
         const auto& orbs       ()                          const { return _orbs; }
         const auto& hops       ()                          const { return _hops; }
-        Real        Ec         ()                          const { return _Ec; }
-        Real        Ng         ()                          const { return _Ng; }
+        Real        V          ()                          const { return _V_charge; }
         void        print_orbs ()                          const;
-        const auto& SC         ()                          const { return _SC; }
 
         void write (ostream& s) const;
         void read  (istream& s);
@@ -105,16 +98,20 @@ class WireSystem
     private:
         using GlobOrbDict = unordered_map <string, vector<int>>;
 
-        unordered_map <string, NonInterChain>     _parts;
-        vector<BasisInfo>                         _orbs;
-        GlobOrbDict                               _to_glob;           // {partition, ki} -> ortical index
-        vector<pair<string,int>>                  _to_local;          // ortical index -> {partition, ki}
+        unordered_map <string, NonInterChain>   _parts;
+        vector<BasisInfo>           _orbs;
+        GlobOrbDict                 _to_glob;           // {partition, ki} -> ortical index
+        vector<pair<string,int>>    _to_local;          // ortical index -> {partition, ki}
         vector<tuple<string,string,int,int,Real>> _hops;
-        Real                                      _Ec, _Ng;
-        vector<pair<string,Real>>                 _SC;
+        Real _V_charge;
 
         void update_order ();
 };
+
+void WireSystem :: add_chain (const string& name, const Matrix& H0)
+{
+    _parts.emplace (name, NonInterChain (H0, name));
+}
 
 template <typename SortFunction, typename... FuncArgs>
 void WireSystem :: sort_basis (SortFunction sort_func, FuncArgs... args)
@@ -174,6 +171,16 @@ void WireSystem :: update_order ()
     }
 }
 
+void WireSystem :: add_hopping (const string& p1, const string& p2, int i1, int i2, Real t)
+{
+    _hops.emplace_back (p1, p2, i1, i2, -t);
+}
+
+void WireSystem :: add_mu (const string& part, Real mu)
+{
+    _parts.at(part).add_mu (mu);
+}
+
 template <typename NumType>
 void add_CdagC (AutoMPO& ampo, const WireSystem& sys, const string& p1, const string& p2, int i1, int i2, NumType coef)
 {
@@ -181,10 +188,10 @@ void add_CdagC (AutoMPO& ampo, const WireSystem& sys, const string& p1, const st
     const auto& chain2 = sys.parts().at(p2);
     if (i1 < 0) i1 += chain1.L()+1;
     if (i2 < 0) i2 += chain2.L()+1;
-    auto terms = quadratic_term_coefs<Real> (chain1, chain2, i1, i2, true, false);
+    auto terms = CdagC_terms (chain1, chain2, i1, i2, coef);
 
     // 
-    bool has_charging = sys.has_part("C");  // charging energy
+    bool has_charging = sys.has_part("C");   // charging energy
     int jc = (has_charging ? sys.to_glob ("C",1) : -1);
     string op_charge = "";
     if (has_charging)
@@ -202,40 +209,20 @@ void add_CdagC (AutoMPO& ampo, const WireSystem& sys, const string& p1, const st
         }
     }
     // Hopping terms
-    for(auto [c12, k1, k2] : terms)
+    for(auto [coef, op1, i1, op2, i2] : terms)
     {
-        int j1 = sys.to_glob (p1,k1);
-        int j2 = sys.to_glob (p2,k2);
+        int j1 = sys.to_glob (p1,i1);
+        int j2 = sys.to_glob (p2,i2);
         // hopping
         if (op_charge != "")
         {
 //cout << "* " << coef << " " << op1 << " " << j1 << " " << op_charge << " " << jc << " " << op2 << " " << j2 << endl;
-            ampo += coef*c12, "Cdag", j1, op_charge, jc, "C", j2;
+            ampo += coef, op1, j1, op_charge, jc, op2, j2;
         }
         else
         {
-            ampo += coef*c12, "Cdag", j1, "C", j2;
+            ampo += coef, op1, j1, op2, j2;
         }
-    }
-}
-
-template <typename NumType>
-void add_SC (AutoMPO& ampo, const WireSystem& sys, const string& p1, const string& p2, int i1, int i2, NumType coef)
-{
-    const auto& chain1 = sys.parts().at(p1);
-    const auto& chain2 = sys.parts().at(p2);
-    if (i1 < 0) i1 += chain1.L()+1;
-    if (i2 < 0) i2 += chain2.L()+1;
-    auto terms = quadratic_term_coefs<Real> (chain1, chain2, i1, i2, false, false);
-
-    for(auto [c12, k1, k2] : terms)
-    {
-        int j1 = sys.to_glob (p1,k1);
-        int j2 = sys.to_glob (p2,k2);
-        auto c = coef * c12;
-        auto cc = iutility::conjT (c);
-        ampo += -c, "C", j1, "C", j2;
-        ampo += -cc, "Cdag", j2, "Cdag", j1;
     }
 }
 
@@ -248,8 +235,32 @@ void add_diag (AutoMPO& ampo, const WireSystem& sys, const string& p, const NonI
     }
 }
 
+// Add -Delta C_i C_i+1 + h.c.
+template <typename NumType>
+void add_SC (AutoMPO& ampo, const WireSystem& sys, const string& p1, const string& p2, int i1, int i2, NumType Delta)
+{
+    const auto& chain1 = sys.parts().at(p1);
+    const auto& chain2 = sys.parts().at(p2);
+    if (i1 < 0) i1 += chain1.L()+1;
+    if (i2 < 0) i2 += chain2.L()+1;
+    auto terms = quadratic_term_coefs<Real> (chain1, chain2, i1, i2, false, false);
+
+    for(auto [c12, k1, k2] : terms)
+    {
+        int j1 = sys.to_glob (p1,k1);
+        int j2 = sys.to_glob (p2,k2);
+        if (j1 != j2)
+        {
+            auto c = Delta * c12;
+            auto cc = iutility::conjT (c);
+            ampo += -c, "C", j1, "C", j2;
+            ampo += -cc, "Cdag", j2, "Cdag", j1;
+        }
+    }
+}
+
 template <typename SiteType>
-AutoMPO get_ampo (const WireSystem& sys, const SiteType& sites, bool hopping=true)
+AutoMPO get_ampo (const WireSystem& sys, const SiteType& sites)
 {
     mycheck (length(sites) == sys.N(), "size not match");
 
@@ -258,27 +269,24 @@ AutoMPO get_ampo (const WireSystem& sys, const SiteType& sites, bool hopping=tru
     for(auto const& [p, chain] : sys.parts())
         add_diag (ampo, sys, p, chain);
     // Hopping terms
-    if (hopping)
+    for(auto const& [p1,p2,i1,i2,coef] : sys.hops())
     {
-        for(auto const& [p1,p2,i1,i2,coef] : sys.hops())
-        {
-            add_CdagC (ampo, sys, p1, p2, i1, i2, coef);
-            add_CdagC (ampo, sys, p2, p1, i2, i1, coef);
-        }
+        add_CdagC (ampo, sys, p1, p2, i1, i2, coef);
+        add_CdagC (ampo, sys, p2, p1, i2, i1, coef);
     }
     // charging energy
     if (sys.has_part("C"))
     {
         int jc = sys.to_glob ("C",1);
-        ampo += sys.Ec(),"NSqr",jc;
-        ampo += sys.Ec()*sys.Ng()*sys.Ng(),"I",jc;
-        ampo += -2.*sys.Ec()*sys.Ng(),"N",jc;
-        //ampo +=  0.5*sys.Ec(),"NSqr",jc;
-        //ampo += -0.5*sys.Ec(),"N",jc;
+        ampo +=  0.5*sys.V(),"NSqr",jc;
+        ampo += -0.5*sys.V(),"N",jc;
+//cout << "** " << sys.V() << " " << jc << endl;
     }
-    // superconducting
-    for(auto [p, Delta] : sys.SC())
+    // Superconducting
+    //for(auto [p, Delta] : sys.SC())
     {
+        string p = "S";
+        Real Delta = 0.5;
         auto const& chain = sys.parts().at(p);
         for(int i = 1; i < chain.L(); i++)
         {
@@ -288,52 +296,138 @@ AutoMPO get_ampo (const WireSystem& sys, const SiteType& sites, bool hopping=tru
     return ampo;
 }
 
+tuple<MPS,Real> get_ground_state_SC (const WireSystem& sys)
+{
+    auto chain = sys.parts().at("S");
+    SpecialFermion sites (chain.L(), {"ConserveN",false,"ConserveNs",false,"conserveQN",true,"special_qn",true});
+    int L_offset = sys.parts().at("L").L()+1;
+    AutoMPO ampo (sites);
+    // Diagonal terms
+    for(auto [coef, op, i] : chain.ops())
+    {
+        int j = sys.to_glob ("S",i)-L_offset;
+        ampo += coef, op, j;
+    }
+    // Superconducting
+    string p = "S";
+    Real Delta = 0.5;
+    for(int i = 1; i < chain.L(); i++)
+    {
+        auto terms = quadratic_term_coefs<Real> (chain, chain, i, i+1, false, false);
+        for(auto [c12, k1, k2] : terms)
+        {
+            int j1 = sys.to_glob (p,k1) - L_offset;
+            int j2 = sys.to_glob (p,k2) - L_offset;
+            if (j1 != j2)
+            {
+                auto c = Delta * c12;
+                auto cc = iutility::conjT (c);
+                ampo += -c, "C", j1, "C", j2;
+                ampo += -cc, "Cdag", j2, "Cdag", j1;
+            }
+        }
+    }
+    auto H0 = toMPO (ampo);
+
+    AutoMPO Nampo (sites);
+    for(int i = 1; i <= length(sites); i++)
+        Nampo += 1.0,"N",i;
+    auto Nmpo = toMPO (Nampo);
+    InitState init (sites);
+    init.set(1,"Occ");
+    auto psi1 = MPS (init);
+    init.set(2,"Occ");
+    auto psi0 = MPS (init);
+
+    auto sweeps = Sweeps(5);
+    sweeps.maxdim() = 16,16,32,32,32;
+    auto en0 = dmrg (psi0, H0, sweeps, {"Quiet",true});
+    auto en1 = dmrg (psi1, H0, sweeps, {"Quiet",true});
+    cout << setprecision(14);
+    cout << "en even/odd = " << en0 << " " << en1 << " " << (0.5*(en0+en1)) << endl;
+
+    MPS psi;
+    Real en;
+    if (abs(en1-en0) < 1e-12)
+    {
+        psi = sum (psi0, psi1);
+        psi.normalize();
+        en = 0.5*(en0+en1);
+    }
+    else if (en1 < en0)
+    {
+        psi = psi1;
+        en = en1;
+    }
+    else
+    {
+        psi = psi0;
+        en = en0;
+    }
+    Real Np = inner (psi,Nmpo,psi);
+    cout << "scatter Np = " << Np << endl;
+    cout << "scatter en = " << en << endl;
+    return {psi, en};
+}
+
 template <typename SiteType>
-MPS get_ground_state (const WireSystem& sys, const SiteType& sites, Real muL=0., Real muS=0., Real muR=0., int NS=0)
+MPS get_ground_state (const WireSystem& sys, const SiteType& sites, Real muL=0., Real muS=0., Real muR=0.)
 {
     mycheck (length(sites) == sys.N(), "size not match");
-    int Ns=0, Np=0;
     Real E = 0.;
+    int Np = 0;
     vector<string> state (sys.N()+1, "Emp");
-    for(string p : {"L","S","R"})
+    for(string p : {"L","R"})
     {
         auto const& chain = sys.parts().at(p);
-        Real mu;
-        if (p == "L")      mu = muL;
-        else if (p == "R") mu = muR;
-        else if (p == "S") mu = muS;
-        for(int i = chain.L(); i >= 1; i--)
+        Real mu = (p == "L" ? muL : muR);
+        for(int i = 1; i <= chain.L(); i++)
         {
             auto const& en = chain.ens()(i-1);
             int j = sys.to_glob (p, i);
-
-            if (p == "S")
-            {
-                if (Ns < NS)
-                {
-                    state.at(j) = "Occ";
-                    E += en;
-                    Np++;
-                    Ns++;
-                }
-            }
-            else if (en-mu < 0.)
+            if (en-mu < 0.)
             {
                 state.at(j) = "Occ";
-                E += en;
+                E += en-mu;
                 Np++;
             }
         }
     }
     // Capacity site
-    {
-        int j = sys.to_glob ("C",1);
-        state.at(j) = str(Ns);
-    }
+    int j = sys.to_glob ("C",1);
+    int Nc = dim (sites(j)) / 2;
+    state.at(j) = str(Nc);
+    cout << "Nc = " << j << " " << Nc << endl;
 
     InitState init (sites);
     for(int i = 1; i <= sys.N(); i++)
         init.set (i, state.at(i));
+    auto psi = MPS (init);
+
+    // Replace the S
+    auto [psiS, enS] = get_ground_state_SC (sys);
+    int L_offset = sys.parts().at("L").L()+1;
+    for(int i = 1; i <= length(psiS); i++)
+    {
+        int i0 = i+L_offset;
+        auto iis = findIndex (psi(i0), "Site");
+        auto iis2 = findIndex (psiS(i), "Site");
+        Index iil;
+        if (i == 1)
+            iil = leftLinkIndex (psi, i0);
+        else if (i == length(psiS))
+            iil = rightLinkIndex (psi, i0);
+        psiS.ref(i).replaceInds ({iis2}, {iis});
+        psi.ref(i0) = psiS(i);
+        if (iil)
+        {
+            mycheck (dim(iil) == 1, "");
+            psi.ref(i0) *= setElt(iil=1);
+        }
+        state.at(i0) = "";
+    }
+    psi.position(1);
+    psi.normalize();
 
     cout << "orbitals, segment, ki, energy, state" << endl;
     for(int i = 1; i <= sys.orbs().size(); i++)
@@ -341,9 +435,9 @@ MPS get_ground_state (const WireSystem& sys, const SiteType& sites, Real muL=0.,
         auto [seg, ki, en] = sys.orbs().at(i-1);
         cout << i << " " << seg << " " << ki << " " << en << " " << state.at(i) << endl;
     }
-    cout << "initial energy = " << E << endl;
-    cout << "initial particle number = " << Np << endl;
-    return MPS (init);
+    cout << "lead en = " << E << endl;
+    cout << "lead Np = " << Np << endl;
+    return psi;
 }
 
 inline void WireSystem :: print_orbs () const
@@ -371,8 +465,7 @@ void WireSystem :: write (ostream& s) const
     iutility::write(s,_to_glob);
     iutility::write(s,_to_local);
     iutility::write(s,_hops);
-    iutility::write(s,_Ec);
-    iutility::write(s,_SC);
+    iutility::write(s,_V_charge);
 }
 
 void WireSystem :: read (istream& s)
@@ -382,8 +475,7 @@ void WireSystem :: read (istream& s)
     iutility::read(s,_to_glob);
     iutility::read(s,_to_local);
     iutility::read(s,_hops);
-    iutility::read(s,_Ec);
-    iutility::read(s,_SC);
+    iutility::read(s,_V_charge);
 }
 
 void WireSystem :: write (const string& fname) const
