@@ -383,9 +383,9 @@ int main(int argc, char* argv[])
     // Current MPO
     int lenL = system.parts().at("L").L();
     int lenS = system.parts().at("S").L();
-    vector<int> spec_links;// = {lenL, lenL+lenS};
-    for(int i = 1; i < system.N_phys(); i++)
-        spec_links.push_back (i);
+    vector<int> spec_links = {lenL-1, lenL+lenS+1};
+    /*for(int i = 1; i < system.N_phys(); i++)
+        spec_links.push_back (i);*/
     int N = system.N();
     vector<MPO> JMPOs (N);
     for(int i : spec_links)
