@@ -51,7 +51,7 @@ MPS get_non_inter_ground_state (const WireSystem& sys, const SiteType& sites, Re
     return MPS (init);
 }
 
-tuple<MPS,MPS,Real,Real,int,int>
+tuple<MPS,MPS,Real,Real,Real,Real>
 get_scatter_ground_state_SC
 (const WireSystem& sys, Real mu, Real Delta,
  const Sweeps& sweeps, const Args& args)
@@ -170,7 +170,7 @@ MPS get_ground_state_SC (const WireSystem& sys, const SiteType& sites,
          en1 = enC1 + enSC1;
     Real en   = (en0 < en1 ? en0 : en1);
     int  n    = (en0 < en1 ? n_even : n_odd);
-    int  Np   = (en0 < en1 ? Np0 : Np1);
+    Real Np   = (en0 < en1 ? Np0 : Np1);
     auto psiS = (en0 < en1 ? psi0 : psi1);
     // Set state
     int ic = sys.to_glob ("C",1);
@@ -179,7 +179,7 @@ MPS get_ground_state_SC (const WireSystem& sys, const SiteType& sites,
     cout << "Init scatter Np (even,odd) = (" << Np0 << "," << Np1 << ") -> " << Np << endl;
     cout << "Init scatter E (even,odd) = (" << en0 << "," << en1 << ") -> " << en << endl
          <<  "\tE_C = (" << enC0 << "," << enC1 << ")" << endl
-         <<  "\tE_SC = (" << enSC0 << "," << enSC1 << ")" << endl;
+         <<  "\tE_SC, gap = (" << enSC0 << "," << enSC1 << "), " << abs(enSC0-enSC1) << endl;
     cout << "Init scatter total charge = (" << n_even << "," << n_odd << ") -> " << n << endl;
 
     // Initialize the leads and the charge site
