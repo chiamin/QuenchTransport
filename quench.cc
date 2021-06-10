@@ -15,6 +15,7 @@ Timers timer;
 #include "MeaCurrent.h"
 #include "tdvp.h"
 #include "basisextension.h"
+#include "InitState.h"
 using namespace vectool;
 using namespace itensor;
 using namespace std;
@@ -138,7 +139,17 @@ Real den (const SiteSet& sites, const MPS& psi, int i)
 {
     AutoMPO ampo (sites);
     ampo += 1.,"N",i;
-    return inner(psi,ampo,psi);
+    auto NN = toMPO (ampo);
+    return real(innerC(psi,NN,psi));
+}
+
+Real den (const SiteSet& sites, const MPS& psi, int i1, int i2)
+{
+    AutoMPO ampo (sites);
+    for(int i = i1; i <= i2; i++)
+        ampo += 1.,"N",i;
+    auto NN = toMPO (ampo);
+    return real(innerC(psi,NN,psi));
 }
 
 template <typename MPSType>
@@ -199,27 +210,54 @@ Mat<NumType> exact_corr2 (const MPS& psi, const WireSystem& sys)
     return corr;
 }
 
+struct Para
+{
+    vector<tuple<string,string,int,int,Real>> hops;
+    Real Ec, Ng, Delta;
+
+    
+    void write (ostream& s) const
+    {
+        iutility::write(s,hops);
+        iutility::write(s,Ec);
+        iutility::write(s,Ng);
+        iutility::write(s,Delta);
+    }
+
+    void read (istream& s)
+    {
+        iutility::read(s,hops);
+        iutility::read(s,Ec);
+        iutility::read(s,Ng);
+        iutility::read(s,Delta);
+    }
+};
+
 void writeAll (const string& filename,
                const MPS& psi, const MPO& H,
                const WireSystem& system,
+               const Para& para,
                int step)
 {
     ofstream ofs (filename);
     itensor::write (ofs, psi);
     itensor::write (ofs, H);
     itensor::write (ofs, step);
+    para.write (ofs);
     system.write (ofs);
 }
 
 void readAll (const string& filename,
               MPS& psi, MPO& H,
               WireSystem& system,
+              Para& para,
               int& step)
 {
     ifstream ifs = open_file (filename);
     itensor::read (ifs, psi);
     itensor::read (ifs, H);
     itensor::read (ifs, step);
+    para.read (ifs);
     system.read (ifs);
 }
 
@@ -237,11 +275,12 @@ int main(int argc, char* argv[])
     auto mu_leadL   = input.getReal("mu_leadL");
     auto mu_leadR   = input.getReal("mu_leadR");
     auto mu_device  = input.getReal("mu_device");
-    auto V_device   = input.getReal("V_device");
     auto mu_biasL   = input.getReal("mu_biasL");
     auto mu_biasS   = input.getReal("mu_biasS");
     auto mu_biasR   = input.getReal("mu_biasR");
     auto Delta      = input.getReal("Delta");
+    auto Ec         = input.getReal("Ec");
+    auto Ng         = input.getReal("Ng");
     auto damp_decay_length = input.getInt("damp_decay_length",10000000);
     auto maxCharge  = input.getInt("maxCharge");
 
@@ -261,7 +300,6 @@ int main(int argc, char* argv[])
     auto globExpanHpsiCutoff = input.getReal("globExpanHpsiCutoff",1e-8);
     auto globExpanHpsiMaxDim = input.getInt("globExpanHpsiMaxDim",300);
     auto globExpanMethod     = input.getString("globExpanMethod","DensityMatrix");
-    auto sweeps        = Read_sweeps (infile);
 
     auto UseSVD        = input.getYesNo("UseSVD",true);
     auto SVDmethod     = input.getString("SVDMethod","gesdd");  // can be also "ITensor"
@@ -274,12 +312,16 @@ int main(int argc, char* argv[])
     auto read_dir      = input.getString("read_dir",".");
     auto read_file     = input.getString("read_file","");
 
+    auto sweeps        = Read_sweeps (infile, "sweeps");
+    auto DMRG_sweeps   = Read_sweeps (infile, "DMRG_sweeps");
+
     MPS psi;
     MPO H;
     auto system = WireSystem();
     int step = 1;
     auto sites = MixedBasis();
-
+    Para para;
+    // Initialization
     if (!read)
     {
         // Define basis
@@ -299,12 +341,9 @@ int main(int argc, char* argv[])
         system.add_chain ("C",H_zero);
         //system.sort_basis (sort_by_energy_S_middle (system.part("S"), {system.part("L"), system.part("R")}));
         system.sort_basis (sort_by_energy_S_middle_charging (system.parts().at("S"), system.parts().at("C"), {system.parts().at("L"), system.parts().at("R")}));
-        system.add_hopping ("L","S",-1,1,t_contactL);
-        system.add_hopping ("R","S",1,-1,t_contactR);
-        system.set_V_charge (V_device);
         cout << "device site = " << system.idevL() << " " << system.idevR() << endl;
 
-        // Make Hamiltonian MPO
+        // SiteSet
         int N = system.N();
         //auto sites = Fermion (N, {"ConserveQNs",ConserveQNs,"ConserveNf",ConserveNf});
         int charge_site = system.to_glob ("C",1);
@@ -315,33 +354,38 @@ int main(int argc, char* argv[])
             if (get<0>(system.orbs().at(i)) == "S")
                 S_sites.push_back (i+1);
         }
+
         Args args_basis = {"MaxOcc",maxCharge,"ConserveN",ConserveN,"ConserveNs",ConserveNs,"conserveQN",conserveQN};
         sites = MixedBasis (N, S_sites, charge_site, args_basis);
         cout << "charge site = " << charge_site << endl;
-        auto ampo = get_ampo (system, sites);
+
+        // Make Hamiltonian MPO
+        para.Ec = Ec;   para.Ng = Ng;   para.Delta = Delta;
+        para.hops.clear();
+        para.hops.emplace_back ("L","S",-1,1,t_contactL);
+        para.hops.emplace_back ("R","S",1,-1,t_contactR);
+        auto ampo = get_ampo (system, sites, para);
         H = toMPO (ampo);
         cout << "MPO dim = " << maxLinkDim(H) << endl;
 
         // Initialze MPS
-        psi = get_ground_state (system, sites, mu_biasL, mu_biasS, mu_biasR);
+        psi = get_ground_state_SC (system, sites, mu_biasL, mu_biasS, mu_biasR, para, DMRG_sweeps, args_basis);
         psi.position(1);
     }
     else
     {
-        readAll (read_dir+"/"+read_file, psi, H, system, step);
+        readAll (read_dir+"/"+read_file, psi, H, system, para, step);
         sites = MixedBasis (siteInds(psi));
     }
     // ======================= Time evolution ========================
-
-    cout << "<Ht> = " << inner (psi, H, psi) << endl;
     // Observer
     auto obs = TDVPObserver (sites, psi, {"charge_site",system.to_glob ("C",1)});
     // Current MPO
     int lenL = system.parts().at("L").L();
     int lenS = system.parts().at("S").L();
-    vector<int> spec_links = {lenL, lenL+lenS};
-    //for(int i = 1; i < system.N_phys(); i++)
-    //    spec_links.push_back (i);
+    vector<int> spec_links;// = {lenL, lenL+lenS};
+    for(int i = 1; i < system.N_phys(); i++)
+        spec_links.push_back (i);
     int N = system.N();
     vector<MPO> JMPOs (N);
     for(int i : spec_links)
@@ -406,20 +450,24 @@ int main(int argc, char* argv[])
             cout << "\t*current " << j << " " << j+1 << " = " << J << endl;
         }*/
         // Measure currents by MPO
-        cout << "\t*current spec" << endl;
         for(int j : spec_links)
         {
             timer["current mps"].start();
             auto J = get_current (JMPOs.at(j), psi);
             timer["current mps"].stop();
-            cout << "\t\t" << j << " " << j+1 << " " << J << endl;
+            cout << "\t*I " << j << " " << j+1 << " " << J << endl;
         }
-        cout << "\tend" << endl;
+
+        Real NN = den (sites, psi, 1, system.idevL()-1);
+        NN += den (sites, psi, system.idevL()+1, length(sites));
+        NN += den (sites, psi, system.to_glob ("C",1));
+        cout << "tot N = " << NN << endl;
+
         step++;
         if (write)
         {
             timer["write"].start();
-            writeAll (write_dir+"/"+write_file, psi, H, system, step);
+            writeAll (write_dir+"/"+write_file, psi, H, system, para, step);
             timer["write"].stop();
         }
     }

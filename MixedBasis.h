@@ -8,7 +8,12 @@ using namespace itensor;
 class SpecialBosonSite
 {
     Index s;
+
+    vector<int> _ns;
+
     public:
+
+    int n (int i) const { return _ns.at(i-1); }
 
     SpecialBosonSite(Index I) : s(I) { }
 
@@ -19,39 +24,41 @@ class SpecialBosonSite
         auto conserveQN = args.getBool("conserveQN",true);
 
         auto tags = TagSet("Site,Boson");
-        auto n = 1;
-        if(args.defined("SiteNumber") )
+        if (args.defined("SiteNumber"))
         {
-            n = args.getInt("SiteNumber");
+            auto n = args.getInt("SiteNumber");
             tags.addTags("n="+str(n));
         }
 
         auto maxOcc = args.getInt("MaxOcc",1);
+        for(int n = -maxOcc; n <= maxOcc; n++)
+            _ns.push_back (n);
+
+        if(conserveNb)
         {
-            if(conserveNb)
+            auto qints = Index::qnstorage(_ns.size());
+            for(int i = 0; i < _ns.size(); i++)
             {
-                auto qints = Index::qnstorage(1+maxOcc);
-                for(int n : range(1+maxOcc)) 
-                {
-                    qints[n] = QNInt(QN({"Nf",0,-1},{"Ns",-n,-1}),1);
-                }
-                s = Index(std::move(qints),Out,tags);
+                int n = _ns.at(i);
+                qints[i] = QNInt(QN({"Nf",0,-1},{"Ns",-n,-1}),1);
             }
-            else
+            s = Index(std::move(qints),Out,tags);
+        }
+        else
+        {
+            auto qints = Index::qnstorage(_ns.size());
+            for(int i = 0; i < _ns.size(); i++)
             {
-                auto qints = Index::qnstorage(1+maxOcc);
-                for(int n : range(1+maxOcc)) 
-                {
-                    int p = n % 2;
-                    if (conserveNs)
-                        qints[n] = QNInt(QN({"Pf",0,-2},{"Ns",-n,-1}),1);
-                    else if (conserveQN)
-                        qints[n] = QNInt(QN({"Pf",0,-2},{"Ps",p,-2}),1);
-                    else
-                        qints[n] = QNInt(QN({"Ps",p,-2}),1);
-                }
-                s = Index(std::move(qints),Out,tags);
+                int n = _ns.at(i);
+                int p = n % 2;
+                if (conserveNs)
+                    qints[i] = QNInt(QN({"Pf",0,-2},{"Ns",-n,-1}),1);
+                else if (conserveQN)
+                    qints[i] = QNInt(QN({"Pf",0,-2},{"Ps",p,-2}),1);
+                else
+                    qints[i] = QNInt(QN({"Ps",p,-2}),1);
             }
+            s = Index(std::move(qints),Out,tags);
         }
     }
 
@@ -59,16 +66,13 @@ class SpecialBosonSite
     index() const { return s; }
 
     IndexVal
-    state(std::string const& state)
+    state(std::string state)
     {
-        auto maxOcc = dim(s)-1;
-        for(auto n : range(1+maxOcc))
-        {
-            if(state == str(n)) return s(1+n);
-        }
 	    if(state == "Emp")
+            state = "0";
+        for(int i = 0; i < _ns.size(); i++)
         {
-            return s(1);
+            if(state == str(_ns.at(i))) return s(i+1);
         }
         throw ITError("State " + state + " not recognized");
         return IndexVal{};
@@ -77,43 +81,46 @@ class SpecialBosonSite
 	ITensor op (std::string const& opname, Args const& args) const
     {
         auto sP = prime(s);
-        auto maxOcc = dim(s)-1;
 
         auto Op = ITensor(dag(s),sP);
 
         if(opname == "N" || opname == "n")
         {
-            for(auto n : range1(1+maxOcc))
+            for(int i = 0; i < _ns.size(); i++)
             {
-                Op.set(s=n,sP=n,n-1);
+                int j = i+1;
+                int n = _ns.at(i);
+                Op.set(s=j,sP=j,n);
             }
         }
         else if(opname == "NSqr" || opname == "nSqr")
         {
-            for(auto n : range1(1+maxOcc))
+            for(int i = 0; i < _ns.size(); i++)
             {
-                Op.set(s=n,sP=n,(n-1)*(n-1));
+                int j = i+1;
+                int n = _ns.at(i);
+                Op.set(s=j,sP=j,n*n);
             }
         }
         else if(opname == "A" or opname == "C")
         {
-            for(auto n : range1(maxOcc))
+            for(int i = 1; i < _ns.size(); i++)
             {
-                Op.set(s=1+n,sP=n,1);
+                Op.set(s=1+i,sP=i,1);
             }
         }
         else if(opname == "Adag" or opname == "Cdag")
         {
-            for(auto n : range1(maxOcc))
+            for(int i = 1; i < _ns.size(); i++)
             {
-                Op.set(s=n,sP=1+n,1);
+                Op.set(s=i,sP=1+i,1);
             }
         }
         else if(opname == "I")
         {
-            for(auto n : range1(1+maxOcc))
+            for(int i = 1; i <= _ns.size(); i++)
             {
-                Op.set(s=n,sP=n,1);
+                Op.set(s=i,sP=i,1);
             }
         }
         else
@@ -129,12 +136,17 @@ class SpecialBosonSite
 
 class MixedBasis : public SiteSet
 {
+    int _maxOcc;
+
     public:
+
+    int maxOcc () const { return _maxOcc; }
 
     MixedBasis() {}
 
     MixedBasis (int N, int iL, int iR, int iC, Args const& args=Args::global())
     {
+        _maxOcc = args.getInt("MaxOcc");
         auto sites = SiteStore(N);
         for(int j = 1; j <= N; ++j)
         {
@@ -147,6 +159,7 @@ class MixedBasis : public SiteSet
 
     MixedBasis (int N, const vector<int>& C_sites, int iC, Args const& args=Args::global())
     {
+        _maxOcc = args.getInt("MaxOcc");
         auto sites = SiteStore(N);
         for(int j = 1; j <= N; ++j)
         {
@@ -166,7 +179,11 @@ class MixedBasis : public SiteSet
             auto ii = is(j);
             mycheck (hasTags(ii,"Boson") or hasTags(ii,"Fermion"), "unknown site index");
             if (hasTags(ii,"Boson"))
+            {
                 sites.set(j,SpecialBosonSite(ii));
+                int d = dim(ii);
+                _maxOcc = (d-1)/2;
+            }
             else
                 sites.set(j,SpecialFermionSite(ii));
         }

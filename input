@@ -9,10 +9,11 @@ basic
     mu_leadL = 0
     mu_leadR = 0
     mu_device = 0
-    V_device = 0
     Delta = 0.5
+    Ec = 2
+    Ng = 1
     damp_decay_lengthX = 40
-    maxCharge = 20
+    maxCharge = 10
 
     ConserveN = no
     ConserveNs = no
@@ -49,6 +50,11 @@ basic
     SVDMethod = gesdd
 
     WriteDim = 2000
+    DMRG_sweeps
+    {
+        maxm   minm   cutoff   niter  noise    nsweep
+        16     1      1E-8     20     1e-8     1
+    }
     sweeps
     {
         maxm   minm   cutoff   niter  noise    nsweep

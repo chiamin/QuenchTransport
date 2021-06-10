@@ -66,7 +66,7 @@ def get_data (fname):
     hopt = get_hop_t (fname)
 
     Is = np.full ((Nstep,L), np.nan)
-    Is_spec = np.full ((Nstep,L), np.nan)
+    Is_spec = np.full ((Nstep,L-1), np.nan)
     ns = np.full ((Nstep,L+1), np.nan)
     Ss = np.full ((Nstep,L+1), np.nan)
     dims = np.full ((Nstep,L), np.nan)
@@ -76,30 +76,28 @@ def get_data (fname):
             if line.startswith ('step ='):
                 tmp = line.split()
                 step = int(tmp[-1])
-            elif line.startswith('*current'):
+            elif line.startswith('*I'):
                 tmp = line.split()
-                ilink = int(tmp[-4])
+                ilink = int(tmp[-3])
 
                 #I = float(tmp[-1].strip('()').split(',')[0])
                 I = float(tmp[-1])
                 cc = 2*pi * hopt[ilink]
-                if 'spec' in line:
-                    Is_spec[step-1,ilink-1] = I * cc
-                else:
-                    Is[step-1,ilink-1] = I * cc
-            elif line.startswith('density '):
+                Is_spec[step-1,ilink-1] = I * cc
+                #Is[step-1,ilink-1] = I * cc
+            elif line.startswith('*den '):
                 tmp = line.split()
                 i = int(tmp[1])
                 n = float(tmp[-1])
                 ns[step-1,i-1] = n
-            elif line.startswith('entang entropy'):
+            elif line.startswith('*entS'):
                 tmp = line.split()
-                i = int(tmp[2])
+                i = int(tmp[1])
                 S = float(tmp[-1])
                 Ss[step-1,i-1] = S
-            elif line.startswith('bond dim'):
+            elif line.startswith('*m'):
                 tmp = line.split()
-                i = int(tmp[-3])
+                i = int(tmp[1])
                 m = float(tmp[-1])
                 dims[step-1,i-1] = m
     return Is, Is_spec, ns, Ss, dims
@@ -261,5 +259,10 @@ if __name__ == '__main__':
         if '-pdf' in sys.argv:
             filename = fname.replace('.out','')+'_I.pdf'
             fi.savefig (filename)
+        if '-save' in sys.argv:
+            with open(fname.replace('.out','')+'_I.txt','w') as f:
+                print ('t {link}',file=f)
+                for i in range(len(ts)):
+                    print (ts[i],*(Is_spec[i,:]/Vb),file=f)
 
     pl.show()

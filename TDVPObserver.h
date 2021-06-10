@@ -74,7 +74,7 @@ void TDVPObserver<SitesType> :: measure (const Args& args)
 
         // Entanglement entropy
         Real S = EntangEntropy (spectrum());
-        cout << "\t*ent S " << oc << " " << S << endl;
+        cout << "\t*entS " << oc << " " << S << endl;
 
         if (oc == _charge_site)
         {
@@ -82,20 +82,17 @@ void TDVPObserver<SitesType> :: measure (const Args& args)
             denmat.takeReal();
             auto [Q,D] = diagHermitian (denmat);
             auto ii = denmat.inds()(1);
-            cout << "\tspecial charge site:" << endl;
+            int maxOcc = _sites.maxOcc();
             for(int i = 1; i <= dim(ii); i++)
-                cout << "\t\t" << elt (denmat,i,i) << " " << elt(D,i,i) << endl;
-            cout << "\tend" << endl;
+                cout << "\t*nC " << i-maxOcc-1 << " " << elt (denmat,i,i) << endl;
         }
     }
 
     // At the end of a sweep
     if (oc == 1 && ha == 2 && b == 1)
     {
-        cout << "\tbond dim:" << endl;
         for(int i = 1; i < N; i++)
-            cout << "\t\t" << i << " " << dim(rightLinkIndex (psi(), i)) << endl;
-        cout << "\tend" << endl;
+            cout << "\t*m " << i << " " << dim(rightLinkIndex (psi(), i)) << endl;
 
         if (_write)
         {
