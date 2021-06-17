@@ -20,58 +20,36 @@ class SpecialFermionSite
           n = args.getInt("SiteNumber");
           ts.addTags("n="+str(n));
         }
-        auto conserve_Nf = args.getBool("ConserveN",true);
-        auto conserve_Ns = args.getBool("ConserveNs",true);
-        auto conserve_QN = args.getBool("conserveQN",true);
-        auto special_qn = args.getBool("special_qn",false);
+        auto SC_scatter = args.getBool("SC_scatter");
+        auto in_scatter = args.getBool("in_scatter");
+        if (SC_scatter)
         {
-            if (conserve_Nf) //usual case
+            if (in_scatter)
             {
-                if (special_qn)
-                {
-                    s = Index(QN({"Nf",0,-1},{"Ns",0,-1}),1,
-                              QN({"Nf",1,-1},{"Ns",1,-1}),1,
-                              Out,ts);
-                }
-                else
-                {
-                    s = Index(QN({"Nf",0,-1},{"Ns",0,-1}),1,
-                              QN({"Nf",1,-1},{"Ns",0,-1}),1,
-                              Out,ts);
-                }
+                s = Index(QN({"Nf",0,-1},{"Ps",0,-2}),1,
+                          QN({"Nf",0,-1},{"Ps",1,-2}),1,
+                          Out,ts);
             }
             else
             {
-                if (special_qn)
-                {
-                    if (conserve_Ns)
-                        s = Index(QN({"Pf",0,-2},{"Ns",0,-1}),1,
-                                  QN({"Pf",1,-2},{"Ns",1,-1}),1,
-                                  Out,ts);
-                    else if (conserve_QN)
-                        s = Index(QN({"Pf",0,-2},{"Ps",0,-2}),1,
-                                  QN({"Pf",1,-2},{"Ps",1,-2}),1,
-                                  Out,ts);
-                    else
-                        s = Index(QN({"Ps",0,-2}),1,
-                                  QN({"Ps",1,-2}),1,
-                                  Out,ts);
-                }
-                else
-                {
-                    if (conserve_Ns)
-                        s = Index(QN({"Pf",0,-2},{"Ns",0,-1}),1,
-                                  QN({"Pf",1,-2},{"Ns",0,-1}),1,
-                                  Out,ts);
-                    else if (conserve_QN)
-                        s = Index(QN({"Pf",0,-2},{"Ps",0,-2}),1,
-                                  QN({"Pf",1,-2},{"Ps",0,-2}),1,
-                                  Out,ts);
-                    else
-                        s = Index(QN({"Ps",0,-2}),1,
-                                  QN({"Ps",0,-2}),1,
-                                  Out,ts);
-                }
+                s = Index(QN({"Nf",0,-1},{"Ps",0,-2}),1,
+                          QN({"Nf",1,-1},{"Ps",0,-2}),1,
+                          Out,ts);
+            }
+        }
+        else
+        {
+            if (in_scatter)
+            {
+                s = Index(QN({"Nf",0,-1},{"Ns",0,-1}),1,
+                          QN({"Nf",1,-1},{"Ns",1,-1}),1,
+                          Out,ts);
+            }
+            else
+            {
+                s = Index(QN({"Nf",0,-1},{"Ns",0,-1}),1,
+                          QN({"Nf",1,-1},{"Ns",0,-1}),1,
+                          Out,ts);
             }
         }
     }

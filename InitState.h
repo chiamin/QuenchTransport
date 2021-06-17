@@ -51,19 +51,30 @@ MPS get_non_inter_ground_state (const WireSystem& sys, const SiteType& sites, Re
     return MPS (init);
 }
 
-tuple<MPS,MPS,Real,Real,Real,Real>
+tuple<MPS,MPS,Real,Real,Real,Real,int>
 get_scatter_ground_state_SC
 (const WireSystem& sys, Real mu, Real Delta,
  const Sweeps& sweeps, const Args& args)
 {
     auto chain = sys.parts().at("S");
-    SpecialFermion sites (chain.L(), {args,"special_qn",true});
-    int L_offset = sys.parts().at("L").L()+1;
+    SpecialFermion sites (chain.L(), {args,"in_scatter",true});
+
+    // Find the first site of the scatter
+    int imin = std::numeric_limits<int>::max();
+    for(auto [coef, op, i] : chain.ops())
+    {
+        int j = sys.to_glob ("S",i);
+        if (imin > j)
+            imin = j;
+    }
+
+    int L_offset = imin-1;
     AutoMPO ampo (sites);
     // Diagonal terms
     for(auto [coef, op, i] : chain.ops())
     {
         int j = sys.to_glob ("S",i)-L_offset;
+cout << "** " << i << "->" << j << endl;
         ampo += coef-mu, op, j;
     }
     // Superconducting
@@ -103,7 +114,7 @@ get_scatter_ground_state_SC
     Real Np0 = inner (psi0,Nmpo,psi0),
          Np1 = inner (psi1,Nmpo,psi1);
 
-    return {psi0, psi1, en0, en1, Np0, Np1};
+    return {psi0, psi1, en0, en1, Np0, Np1, L_offset};
 }
 
 template <typename SiteType, typename Para>
@@ -136,7 +147,7 @@ MPS get_ground_state_SC (const WireSystem& sys, const SiteType& sites,
     cout << "lead Np = " << Np_lead << endl;
 
     // Get ground state of scatter
-    auto [psi0, psi1, enSC0, enSC1, Np0, Np1] = get_scatter_ground_state_SC (sys, muS, para.Delta, sweeps, args);
+    auto [psi0, psi1, enSC0, enSC1, Np0, Np1, L_offset] = get_scatter_ground_state_SC (sys, muS, para.Delta, sweeps, args);
 
     // Capacity site
     // Find out the charge numbers, as integers, that lowest the charging energy, for even and odd parities
@@ -189,10 +200,10 @@ MPS get_ground_state_SC (const WireSystem& sys, const SiteType& sites,
     auto psi = MPS (init);
 
     // Replace the tensors in the scatter
-    int L_offset = sys.parts().at("L").L()+1;
     for(int i = 1; i <= length(psiS); i++)
     {
         int i0 = i+L_offset;
+cout << "!! " << i << "->" << i0 << endl;
         auto iis = findIndex (psi(i0), "Site");
         auto iis2 = findIndex (psiS(i), "Site");
         Index iil;

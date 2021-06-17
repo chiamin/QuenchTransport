@@ -10,22 +10,20 @@ basic
     mu_leadR = 0
     mu_device = 0
     Delta = 0.5
-    Ec = 2
-    Ng = 1
-    damp_decay_lengthX = 40
-    maxCharge = 10
+    Ec = 0
+    Ng = 0
+    damp_decay_lengthX = 50
+    maxCharge = 5
 
-    ConserveN = no
-    ConserveNs = no
-    conserveQN = yes
+    SC_scatter = yes
 
     mu_biasL = 0.4
     mu_biasS = 0
     mu_biasR = 0
-    dt = 0.25
-    time_steps = 80
+    dt = 1
+    time_steps = 20
     NumCenter = 1
-    mixNumCenter = yes
+    mixNumCenter = no
     globExpanN = 100
     globExpanItv = 1
     globExpanCutoff = 1e-4
@@ -52,12 +50,15 @@ basic
     WriteDim = 2000
     DMRG_sweeps
     {
-        maxm   minm   cutoff   niter  noise    nsweep
-        16     1      1E-8     20     1e-8     1
+        maxm    cutoff   niter  noise    nsweep
+        16      1E-8     10     1e-8     2
+        32      1E-12    10     1e-10    2
+        64      1E-12    10     0        2
+        128     1E-12    10     0        2
     }
     sweeps
     {
         maxm   minm   cutoff   niter  noise    nsweep
-        64     16     1E-8     20     1e-8     1
+        128    16     1E-6     20     0        1
     }
 }

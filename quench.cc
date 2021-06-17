@@ -284,9 +284,7 @@ int main(int argc, char* argv[])
     auto damp_decay_length = input.getInt("damp_decay_length",10000000);
     auto maxCharge  = input.getInt("maxCharge");
 
-    auto ConserveN   = input.getYesNo("ConserveN",false);
-    auto ConserveNs  = input.getYesNo("ConserveNs",true);
-    auto conserveQN  = input.getYesNo("conserveQN",true);
+    auto SC_scatter  = input.getYesNo("SC_scatter");
 
     auto dt            = input.getReal("dt");
     auto time_steps    = input.getInt("time_steps");
@@ -341,6 +339,7 @@ int main(int argc, char* argv[])
         system.add_chain ("C",H_zero);
         //system.sort_basis (sort_by_energy_S_middle (system.part("S"), {system.part("L"), system.part("R")}));
         system.sort_basis (sort_by_energy_S_middle_charging (system.parts().at("S"), system.parts().at("C"), {system.parts().at("L"), system.parts().at("R")}));
+        system.print_orbs();
         cout << "device site = " << system.idevL() << " " << system.idevR() << endl;
 
         // SiteSet
@@ -354,8 +353,8 @@ int main(int argc, char* argv[])
             if (get<0>(system.orbs().at(i)) == "S")
                 S_sites.push_back (i+1);
         }
-
-        Args args_basis = {"MaxOcc",maxCharge,"ConserveN",ConserveN,"ConserveNs",ConserveNs,"conserveQN",conserveQN};
+        // Make SiteSet
+        Args args_basis = {"MaxOcc",maxCharge,"SC_scatter",SC_scatter};
         sites = MixedBasis (N, S_sites, charge_site, args_basis);
         cout << "charge site = " << charge_site << endl;
 
@@ -410,6 +409,9 @@ int main(int argc, char* argv[])
     auto sub_corr = SubCorr (system, ibeg, iend);*/
 
     // Time evolution
+
+cout << "aa " << innerC(psi,H,psi) << endl;
+
     cout << "Start time evolution" << endl;
     cout << sweeps << endl;
     psi.position(1);
