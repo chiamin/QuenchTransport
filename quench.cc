@@ -409,9 +409,6 @@ int main(int argc, char* argv[])
     auto sub_corr = SubCorr (system, ibeg, iend);*/
 
     // Time evolution
-
-cout << "aa " << innerC(psi,H,psi) << endl;
-
     cout << "Start time evolution" << endl;
     cout << sweeps << endl;
     psi.position(1);

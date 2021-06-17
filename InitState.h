@@ -74,7 +74,6 @@ get_scatter_ground_state_SC
     for(auto [coef, op, i] : chain.ops())
     {
         int j = sys.to_glob ("S",i)-L_offset;
-cout << "** " << i << "->" << j << endl;
         ampo += coef-mu, op, j;
     }
     // Superconducting
@@ -203,7 +202,6 @@ MPS get_ground_state_SC (const WireSystem& sys, const SiteType& sites,
     for(int i = 1; i <= length(psiS); i++)
     {
         int i0 = i+L_offset;
-cout << "!! " << i << "->" << i0 << endl;
         auto iis = findIndex (psi(i0), "Site");
         auto iis2 = findIndex (psiS(i), "Site");
         Index iil;
