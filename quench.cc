@@ -215,7 +215,6 @@ struct Para
     vector<tuple<string,string,int,int,Real>> hops;
     Real Ec, Ng, Delta;
 
-    
     void write (ostream& s) const
     {
         iutility::write(s,hops);
@@ -259,6 +258,49 @@ void readAll (const string& filename,
     itensor::read (ifs, step);
     para.read (ifs);
     system.read (ifs);
+}
+
+tuple<vector<Sweeps>, vector<int>> read_sweeps (const string& filename, string key)
+{
+    vector<int> m, niter;
+    vector<Real> cutoff, noise;
+
+    ifstream ifs (filename);
+    vector<string> lines = read_bracket (ifs, key, 0);
+    ifs.close();
+
+    auto keys = split_str<string> (lines.at(0));
+    unordered_map <string, int> ii;
+    for(int i = 0; i < keys.size(); i++)
+        ii[keys.at(i)] = i;
+
+    vector<Sweeps> sweepss;
+    vector<int> upto_ms;
+    for(size_t i = 1; i <= lines.size()-1; i++)
+    {
+        auto tmp = split_str<Real> (lines.at(i));
+        int nsweep = tmp.at(ii.at("nsweep"));
+        Sweeps sweeps (nsweep);
+        for(int isw = 1; isw <= nsweep; isw++)
+        {
+            if (ii.count("minm") != 0)
+                sweeps.setmindim (isw, tmp.at(ii.at("minm")));
+            sweeps.setmaxdim (isw, tmp.at(ii.at("maxm")));
+            sweeps.setcutoff (isw, tmp.at(ii.at("cutoff")));
+            sweeps.setniter  (isw, tmp.at(ii.at("niter")));
+        }
+        sweepss.push_back (sweeps);
+        upto_ms.push_back (tmp.at(ii.at("uptom")));
+    }
+    return {sweepss, upto_ms};
+}
+
+inline int get_sweeps_i (int m, const vector<Sweeps>& sweepss, const vector<int>& upto_ms)
+{
+    for(int i = 0; i < sweepss.size(); i++)
+        if (upto_ms.at(i) >= m)
+            return i;
+    return sweepss.size()-1;
 }
 
 int main(int argc, char* argv[])
@@ -310,8 +352,8 @@ int main(int argc, char* argv[])
     auto read_dir      = input.getString("read_dir",".");
     auto read_file     = input.getString("read_file","");
 
-    auto sweeps        = Read_sweeps (infile, "sweeps");
-    auto DMRG_sweeps   = Read_sweeps (infile, "DMRG_sweeps");
+    auto [sweepss, upto_ms] = read_sweeps (infile, "sweeps");
+    auto DMRG_sweeps        = iutility::Read_sweeps (infile, "DMRG_sweeps");
 
     MPS psi;
     MPO H;
@@ -370,6 +412,7 @@ int main(int argc, char* argv[])
         // Initialze MPS
         psi = get_ground_state_SC (system, sites, mu_biasL, mu_biasS, mu_biasR, para, DMRG_sweeps, args_basis);
         psi.position(1);
+        cout << "MPS dim = " << maxLinkDim(psi) << endl;
     }
     else
     {
@@ -410,7 +453,6 @@ int main(int argc, char* argv[])
 
     // Time evolution
     cout << "Start time evolution" << endl;
-    cout << sweeps << endl;
     psi.position(1);
     Real en, err;
     Args args_tdvp_expansion = {"Cutoff",globExpanCutoff, "Method","DensityMatrix",
@@ -418,12 +460,23 @@ int main(int argc, char* argv[])
     Args args_tdvp  = {"Quiet",true,"NumCenter",NumCenter,"DoNormalize",true,"Truncate",Truncate,
                        "UseSVD",UseSVD,"SVDmethod",SVDmethod,"WriteDim",WriteDim,"mixNumCenter",mixNumCenter};
     LocalMPO PH (H, args_tdvp);
+    int sweep_i_pre = -1;
+    Sweeps sweeps;
     while (step <= time_steps)
     {
         cout << "step = " << step << endl;
 
+        int m = maxLinkDim(psi);
+        int iswp = get_sweeps_i (m, sweepss, upto_ms);
+        if (sweep_i_pre != iswp)
+        {
+            sweeps = sweepss.at(iswp);
+            cout << sweeps << endl;
+            sweep_i_pre = iswp;
+        }
+
         // Subspace expansion
-        if (maxLinkDim(psi) < sweeps.mindim(1) or (step < globExpanN and (step-1) % globExpanItv == 0))
+        if (m < sweeps.mindim(1) or (step < globExpanN and (step-1) % globExpanItv == 0))
         {
             timer["glob expan"].start();
             addBasis (psi, H, globExpanHpsiCutoff, globExpanHpsiMaxDim, args_tdvp_expansion);
