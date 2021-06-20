@@ -290,7 +290,8 @@ tuple<vector<Sweeps>, vector<int>> read_sweeps (const string& filename, string k
             sweeps.setniter  (isw, tmp.at(ii.at("niter")));
         }
         sweepss.push_back (sweeps);
-        upto_ms.push_back (tmp.at(ii.at("uptom")));
+        int upto_m = (ii.count("minm") == 0 ? tmp.at(ii.at("maxm")) : tmp.at(ii.at("uptom")));
+        upto_ms.push_back (upto_m);
     }
     return {sweepss, upto_ms};
 }
