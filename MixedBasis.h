@@ -15,7 +15,13 @@ class SpecialBosonSite
 
     int n (int i) const { return _ns.at(i-1); }
 
-    SpecialBosonSite(Index I) : s(I) { }
+    SpecialBosonSite(Index I) : s(I)
+    {
+        int d = dim(I);
+        int maxOcc = (d-1)/2;
+        for(int n = -maxOcc; n <= maxOcc; n++)
+            _ns.push_back (n);
+    }
 
     SpecialBosonSite(Args const& args = Args::global())
     {
@@ -70,7 +76,6 @@ class SpecialBosonSite
         auto sP = prime(s);
 
         auto Op = ITensor(dag(s),sP);
-
         if(opname == "N" || opname == "n")
         {
             for(int i = 0; i < _ns.size(); i++)
