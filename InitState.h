@@ -101,6 +101,8 @@ get_scatter_ground_state_SC
     auto psi0 = MPS (init);
     init.set(1,"Occ");
     auto psi1 = MPS (init);
+init.set(2,"Occ");
+psi0 = MPS (init);
 
     auto en0 = dmrg (psi0, H0, sweeps, {"Quiet",true});
     auto en1 = dmrg (psi1, H0, sweeps, {"Quiet",true});
@@ -124,7 +126,7 @@ MPS get_ground_state_SC (const WireSystem& sys, const SiteType& sites,
     mycheck (length(sites) == sys.N(), "size not match");
     // Leads
     Real E_lead = 0.;
-    int Np_lead = 0;
+    int Np_L=0, Np_R=0;
     vector<string> state (sys.N()+1, "Emp");
     for(string p : {"L","R"})
     {
@@ -138,12 +140,15 @@ MPS get_ground_state_SC (const WireSystem& sys, const SiteType& sites,
             {
                 state.at(j) = "Occ";
                 E_lead += en-mu;
-                Np_lead++;
+                if (p == "L")
+                    Np_L++;
+                else
+                    Np_R++;
             }
         }
     }
     cout << "lead E = " << E_lead << endl;
-    cout << "lead Np = " << Np_lead << endl;
+    cout << "lead Np L,R = " << Np_L << " " << Np_R << endl;
 
     // Get ground state of scatter
     auto [psi0, psi1, enSC0, enSC1, Np0, Np1, L_offset] = get_scatter_ground_state_SC (sys, muS, para.Delta, sweeps, args);

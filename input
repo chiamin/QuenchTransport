@@ -1,6 +1,6 @@
 basic
 {
-    L_lead = 10
+    L_lead = 30
     L_device = 7
     t_lead = 1
     t_device = 0.1
@@ -11,24 +11,24 @@ basic
     mu_device = -0.5
     Delta = 0.5
     Ec = 0.3
-    Ng = 1.01
-    damp_decay_lengthX = 50
+    Ng = 1.0
+    damp_decay_length = 50
     maxCharge = 5
 
     SC_scatter = yes
 
-    mu_biasL = 0.4
+    mu_biasL = 0.2
     mu_biasS = 0
-    mu_biasR = 0
+    mu_biasR = -0.2
     dt = 1
-    time_steps = 3
+    time_steps = 150
     NumCenter = 1
     mixNumCenter = no
     globExpanN = 100
     globExpanItv = 1
     globExpanCutoff = 1e-4
     globExpanKrylovDim = 2
-    globExpanHpsiCutoff = 1e-10
+    globExpanHpsiCutoff = 1e-14
     globExpanHpsiMaxDim = 100
     globExpanMethod = Fit
     Truncate = yes
@@ -51,15 +51,14 @@ basic
     DMRG_sweeps
     {
         maxm    cutoff   niter  noise    nsweep
-        16      1E-8     10     1e-8     2
+        16      1E-8     10     1e-6     2
         32      1E-12    10     1e-10    2
         64      1E-12    10     0        2
         128     1E-12    10     0        2
     }
     sweeps
     {
-        maxm   minm   uptom    cutoff   niter   nsweep
-        100    1      20       1E-8     20      1
-        100    1      30       1E-6     20      1
+        maxm   minm       cutoff   niter   nsweep
+        64     8          1E-8     20      1
     }
 }

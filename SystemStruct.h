@@ -171,6 +171,7 @@ void add_CdagC (AutoMPO& ampo, const WireSystem& sys, const string& p1, const st
     const auto& chain2 = sys.parts().at(p2);
     if (i1 < 0) i1 += chain1.L()+1;
     if (i2 < 0) i2 += chain2.L()+1;
+
     auto terms = CdagC_terms (chain1, chain2, i1, i2, coef);
 
     // 
@@ -179,14 +180,11 @@ void add_CdagC (AutoMPO& ampo, const WireSystem& sys, const string& p1, const st
     string op_charge = "";
     if (has_charging)
     {
-        if ((p1 == "L" and p2 == "S") or    // Cdag_L C_S
-            (p1 == "R" and p2 == "S"))      // Cdag_R C_S
+        if (p1 != "S" and p2 == "S")      // Cdag_R C_S
         {
             op_charge = "A";
         }
-        else
-        if ((p1 == "S" and p2 == "L") or    // Cdag_S C_L
-            (p1 == "S" and p2 == "R"))      // Cdag_S C_R
+        else if (p1 == "S" and p2 != "S")
         {
             op_charge = "Adag";
         }
@@ -267,6 +265,7 @@ AutoMPO get_ampo (const WireSystem& sys, const SiteType& sites, const Para& para
     auto const& chain = sys.parts().at("S");
     for(int i = 1; i < chain.L(); i++)
         add_SC (ampo, sys, "S", "S", i, i+1, Delta);
+
     return ampo;
 }
 
