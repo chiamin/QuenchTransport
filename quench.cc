@@ -372,7 +372,7 @@ int main(int argc, char* argv[])
         cout << "H right lead" << endl;
         auto H_leadR = Hamilt_k (L_lead, t_lead, mu_leadR, damp_fac, false, true);
         cout << "H dev" << endl;
-        auto H_dev   = Hamilt_k (L_device, t_device, mu_device, damp_fac, true, true);
+        auto H_dev   = Hamilt_k (L_device, t_device, mu_device, 1., true, true);
         auto H_zero  = Matrix(1,1);
 
         // WireSystem
