@@ -64,12 +64,14 @@ def get_data (fname):
     idevL, idevR = get_para (fname, 'device site', int, n=2)
     iC = get_para (fname, 'charge site', int)
     hopt = get_hop_t (fname)
+    maxnC = get_para (fname, 'maxCharge', int)
 
     Is = np.full ((Nstep,L), np.nan)
     Is_spec = np.full ((Nstep,L-1), np.nan)
     ns = np.full ((Nstep,L+1), np.nan)
     Ss = np.full ((Nstep,L+1), np.nan)
     dims = np.full ((Nstep,L), np.nan)
+    nCs = np.full ((Nstep,2*maxnC+1), np.nan)
     with open(fname) as f:
         for line in f:
             line = line.lstrip()
@@ -100,7 +102,12 @@ def get_data (fname):
                 i = int(tmp[1])
                 m = float(tmp[-1])
                 dims[step-1,i-1] = m
-    return Is, Is_spec, ns, Ss, dims
+            elif line.startswith('*nC'):
+                tmp = line.split()
+                n = int(tmp[-2])
+                nC = float(tmp[-1])
+                nCs[step-1,n+maxnC] = nC
+    return Is, Is_spec, ns, Ss, dims, nCs
 
 def plot_prof (ax, data, dt, label=''):
     Nstep, L = np.shape(data)
@@ -143,6 +150,35 @@ def extrap_current (ts, Il, Ir, plot=False):
         fitx, fity, stddev, fit = ff.myfit (ts, Il, order=1, ax=ax, refit=True)
         fitx, fity, stddev, fit = ff.myfit (ts, Ir, order=1, ax=ax, refit=True)
 
+def get_avg (I, ts, tbeg, tend):
+    tibeg = np.argmax (ts > tbeg)
+    tiend = np.argmax (ts >= tend)+1
+    if tiend == 1: tiend = len(I)
+    if np.isnan(I[tiend-1]): tiend -= 1
+    I_window = I[tibeg-1:tiend]
+    return np.mean(I_window), np.std(I_window)
+
+def get_current (fname, Is_spec, tbeg, tend, ax=None):
+    # current vs time
+    idevL, idevR = get_para (fname, 'device site', int, n=2)
+    Il = Is_spec[:, idevL-3]
+    Ir = Is_spec[:, idevR-1]
+    dt = get_para (fname, 'dt', float)
+    Nstep = len(Il)
+    ts = dt * np.arange(1,Nstep+1)
+    Ilm, errl = get_avg (Il, ts, tbeg, tend)
+    Irm, errr = get_avg (Ir, ts, tbeg, tend)
+    print ('I/V left,right =', Ilm, Irm)
+    if ax != None:
+        ax.plot (ts, Il, label='left')
+        ax.plot (ts, Ir, label='right')
+        ax.axhline (Ilm)
+        ax.axhline (Irm)
+        ax.set_xlabel ('time')
+        ax.set_ylabel ('conductance')
+        ax.legend()
+        ps.set(ax)
+    return Ilm, errl, Irm, errr
 
 if __name__ == '__main__':
     files = [i for i in sys.argv[1:] if i[0] != '-']
@@ -153,7 +189,7 @@ if __name__ == '__main__':
         en_basis, segs = get_basis (fname)
 
         # Get data
-        Is, Is_spec, ns, Ss, dims = get_data (fname)
+        Is, Is_spec, ns, Ss, dims, nCs = get_data (fname)
         dt = get_para (fname, 'dt', float)
         m = get_para (fname, 'Largest link dim', int)
         Nstep, L = np.shape(Is)
@@ -234,17 +270,42 @@ if __name__ == '__main__':
         ax3.plot (ts, N_dev, marker='.')
         ps.set(ax3)'''
 
+        f,ax = pl.subplots()
+        maxnC = get_para (fname, 'maxCharge', int)
+        plot_time_slice (ax, nCs, n=5, xs=range(-maxnC,maxnC+1), marker='.', ls='None')
+        ax.set_xlabel ('$n_C$')
+        ax.set_ylabel ('occupassion')
+        ps.set_tick_inteval (ax.xaxis, 1)
+        ps.set(ax)
+
+        f,ax = pl.subplots()
+        ii = segs == 'L'
+        nL = ns[:,ii].sum(axis=1)
+        ii = segs == 'R'
+        nR = ns[:,ii].sum(axis=1)
+        nC = ns[:,idevL]
+        ax.plot (ts, nL, label='L')
+        ax.plot (ts, nR, label='R')
+        ax.plot (ts, nC, label='C')
+        ax.set_xlabel ('t')
+        ax.set_ylabel ('N')
+        ps.set(ax)
+
         # current vs time
         muL = get_para (fname, 'mu_biasL', float)
         muR = get_para (fname, 'mu_biasR', float)
         Vb = muR - muL
-        Il = Is_spec[:, idevL-2] / Vb
-        Ir = Is_spec[:, idevR-2] / Vb
+        print ('Vbias =',Vb)
+        Il = Is_spec[:, idevL-3] / Vb
+        Ir = Is_spec[:, idevR-1] / Vb
         axi.plot (ts, Il, label='left')
         axi.plot (ts, Ir, label='right')
-        #axi.plot (ts, Is[:, idevL-3] / Vb, marker='.', label='l2')
-        #axi.plot (ts, Is[:, idevL] / Vb, marker='.', label='r2')
-        #extrap_current (ts, Il, Ir, plot=True)
+        t1,t2 = 150,200
+        Ilm, errl = get_avg (Il, ts, t1, t2)
+        Irm, errr = get_avg (Ir, ts, t1, t2)
+        axi.axhline (Ilm)
+        axi.axhline (Irm)
+        print ('I/V left,right =', Ilm, Irm)
         axi.set_xlabel ('time')
         axi.set_ylabel ('conductance')
         axi.legend()
