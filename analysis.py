@@ -25,6 +25,7 @@ def get_para (fname, key, typ, last=False, n=1):
                     return val
         return val
 
+# Get t on each bond
 def get_hop_t (fname):
     L_lead = get_para (fname, 'L_lead', int)
     L_device = get_para (fname, 'L_device', int)
@@ -138,18 +139,6 @@ def get_basis (fname):
                     ens.append (float(tmp[3]))
                     segs.append (tmp[1])
 
-def extrap_current (ts, Il, Ir, plot=False):
-    n = 100
-    ts = np.reciprocal(ts)[-n:]
-    Il = Il[-n:]
-    Ir = Ir[-n:]
-    if plot:
-        f,ax = pl.subplots()
-        ax.plot (ts, Il, marker='.', ls='None', label='left')
-        ax.plot (ts, Ir, marker='.', ls='None', label='right')
-        fitx, fity, stddev, fit = ff.myfit (ts, Il, order=1, ax=ax, refit=True)
-        fitx, fity, stddev, fit = ff.myfit (ts, Ir, order=1, ax=ax, refit=True)
-
 def get_avg (I, ts, tbeg, tend):
     tibeg = np.argmax (ts > tbeg)
     tiend = np.argmax (ts >= tend)+1
@@ -175,7 +164,7 @@ def get_current (fname, Is_spec, tbeg, tend, ax=None):
         ax.axhline (Ilm)
         ax.axhline (Irm)
         ax.set_xlabel ('time')
-        ax.set_ylabel ('conductance')
+        ax.set_ylabel ('current')
         ax.legend()
         ps.set(ax)
     return Ilm, errl, Irm, errr
