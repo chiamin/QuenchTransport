@@ -16,199 +16,11 @@ Timers timer;
 #include "tdvp.h"
 #include "basisextension.h"
 #include "InitState.h"
+#include "Tools.h"
 using namespace vectool;
 using namespace itensor;
 using namespace std;
 using namespace iutility;
-
-MPO Make_NMPO (const MixedBasis& sites)
-{
-    AutoMPO ampo (sites);
-    for(int i = 1; i <= length(sites); i++)
-    {
-        ampo += 1.0,"N",i;
-    }
-    return toMPO (ampo);
-}
-
-template <typename SiteType>
-MPS make_initstate (const SiteType& sites, int Np)
-{
-    int N = length(sites);
-    int Npar = Np;
-    InitState init (sites);
-    for(int i = 1; i <= N; i++)
-    {
-        string state;
-        if (i % 2 == 0 and Np > 0)
-        {
-            state = "Occ";
-            Np--;
-        }
-        else
-            state = "Emp";
-        init.set (i, state);
-        cout << i << ": " << state << endl;
-    }
-    if (Np > 0)
-    {
-        for(int i = 1; i <= N; i += 2)
-            if (Np > 0)
-            {
-                init.set (i,"Occ");
-                Np--;
-            }
-    }
-    auto psi = MPS (init);
-
-    auto Nmpo = Make_NMPO (sites);
-    auto Ntot = inner (psi,Nmpo,psi);
-    if (Ntot != Npar)
-    {
-        cout << "particle number not match:" << Ntot << " " << Npar << endl;
-        throw;
-    }
-    return psi;
-}
-
-template <typename SiteType>
-MPS make_initstate_charge_site (const SiteType& sites, int Np, const WireSystem& sys)
-{
-    int charge_site = sys.to_glob ("C",1);
-    int N = length(sites);
-    int Npar = Np;
-    InitState init (sites);
-    int Np_device = 0;
-    for(int i = 1; i <= N; i++)
-    {
-        string state;
-        if (i != charge_site)
-        {
-            if (i % 2 == 0 and Np > 0)
-            {
-                state = "Occ";
-                Np--;
-                // count number of particle in device
-                auto [seg,ind] = sys.to_loc (i);
-                if (seg == "S")
-                    Np_device++;
-            }
-            else
-                state = "Emp";
-            init.set (i, state);
-            cout << i << ": " << state << endl;
-        }
-    }
-    if (Np > 0)
-    {
-        for(int i = 1; i <= N; i += 2)
-            if (Np > 0 and i != charge_site)
-            {
-                init.set (i,"Occ");
-                Np--;
-                cout << i << ": Occ" << endl;
-
-                // count number of particle in device
-                auto [seg,ind] = sys.to_loc (i);
-                if (seg == "S")
-                    Np_device++;
-            }
-    }
-    // Set charge site
-    init.set (charge_site, str(Np_device));
-    cout << charge_site << ": " << Np_device << endl;
-    auto psi = MPS (init);
-
-    return psi;
-}
-
-template <typename T>
-bool ordered (const vector<T>& ns, T resolution=1e-4)
-{
-    for(int i = 1; i < ns.size(); i++)
-    {
-        T n1 = ns.at(i-1),
-          n2 = ns.at(i);
-        if (abs(n1-n2) > resolution and n2 > n1)
-            return false;
-    }
-    return true;
-}
-
-Real den (const SiteSet& sites, const MPS& psi, int i)
-{
-    AutoMPO ampo (sites);
-    ampo += 1.,"N",i;
-    auto NN = toMPO (ampo);
-    return real(innerC(psi,NN,psi));
-}
-
-Real den (const SiteSet& sites, const MPS& psi, int i1, int i2)
-{
-    AutoMPO ampo (sites);
-    for(int i = i1; i <= i2; i++)
-        ampo += 1.,"N",i;
-    auto NN = toMPO (ampo);
-    return real(innerC(psi,NN,psi));
-}
-
-template <typename MPSType>
-ITensor print_wf (const MPSType& psi)
-{
-    ITensor pp (1.);
-    vector<Index> iis;
-    for(int i = 1; i <= length(psi); i++)
-    {
-        pp *= psi(i);
-        auto is = findIndex (psi(i), "Site,0");
-        iis.push_back (is);
-        if constexpr (is_same_v <MPO, MPSType>)
-            iis.push_back (prime(is));
-    }
-    pp.permute (iis);
-    PrintData(pp);
-    return pp;
-}
-
-template <typename SiteType, typename NumType>
-Mat<NumType> exact_corr2 (const MPS& psi, const WireSystem& sys)
-{
-    int N = length (psi);
-    auto sites = SiteType (siteInds(psi));
-    auto corr = Mat<NumType> (N,N);
-
-    auto apply_op = [&sites] (MPS& phi, string op, int j)
-    {
-        phi.ref(j) *= sites.op(op,j);
-        phi.ref(j).noPrime("Site");
-    };
-
-    int ic = sys.to_glob ("C",1);
-    for(int i = 1; i <= N; i++)
-        for(int j = i; j <= N; j++)
-        {
-            auto [seg1, iseg1] = sys.to_loc(i);
-            auto [seg2, iseg2] = sys.to_loc(j);
-            if (seg1 == "C" or seg2 == "C")
-                continue;
-
-            auto phi = psi;
-            apply_op (phi, "C", j);
-            apply_op (phi, "Cdag", i);
-            if (seg1 != "S" and seg2 == "S")
-                apply_op (phi, "A", ic);
-            else if (seg1 == "S" and seg2 != "S")
-                apply_op (phi, "Adag", ic);
-
-            if constexpr (is_same_v <NumType, Real>)
-                corr(i-1,j-1) = inner (psi, phi);
-            else
-                corr(i-1,j-1) = innerC (psi, phi);
-            if (i != j)
-                corr(j-1,i-1) = corr(i-1,j-1);
-        }
-    return corr;
-}
 
 struct Para
 {
@@ -260,50 +72,6 @@ void readAll (const string& filename,
     system.read (ifs);
 }
 
-tuple<vector<Sweeps>, vector<int>> read_sweeps (const string& filename, string key)
-{
-    vector<int> m, niter;
-    vector<Real> cutoff, noise;
-
-    ifstream ifs (filename);
-    vector<string> lines = read_bracket (ifs, key, 0);
-    ifs.close();
-
-    auto keys = split_str<string> (lines.at(0));
-    unordered_map <string, int> ii;
-    for(int i = 0; i < keys.size(); i++)
-        ii[keys.at(i)] = i;
-
-    vector<Sweeps> sweepss;
-    vector<int> upto_ms;
-    for(size_t i = 1; i <= lines.size()-1; i++)
-    {
-        auto tmp = split_str<Real> (lines.at(i));
-        int nsweep = tmp.at(ii.at("nsweep"));
-        Sweeps sweeps (nsweep);
-        for(int isw = 1; isw <= nsweep; isw++)
-        {
-            if (ii.count("minm") != 0)
-                sweeps.setmindim (isw, tmp.at(ii.at("minm")));
-            sweeps.setmaxdim (isw, tmp.at(ii.at("maxm")));
-            sweeps.setcutoff (isw, tmp.at(ii.at("cutoff")));
-            sweeps.setniter  (isw, tmp.at(ii.at("niter")));
-        }
-        sweepss.push_back (sweeps);
-        int upto_m = (ii.count("uptom") == 0 ? tmp.at(ii.at("maxm")) : tmp.at(ii.at("uptom")));
-        upto_ms.push_back (upto_m);
-    }
-    return {sweepss, upto_ms};
-}
-
-inline int get_sweeps_i (int m, const vector<Sweeps>& sweepss, const vector<int>& upto_ms)
-{
-    for(int i = 0; i < sweepss.size(); i++)
-        if (upto_ms.at(i) >= m)
-            return i;
-    return sweepss.size()-1;
-}
-
 int main(int argc, char* argv[])
 {
     string infile = argv[1];
@@ -326,8 +94,6 @@ int main(int argc, char* argv[])
     auto Ng         = input.getReal("Ng");
     auto damp_decay_length = input.getInt("damp_decay_length",10000000);
     auto maxCharge  = input.getInt("maxCharge");
-
-    auto SC_scatter  = input.getYesNo("SC_scatter");
 
     auto dt            = input.getReal("dt");
     auto time_steps    = input.getInt("time_steps");
@@ -353,11 +119,11 @@ int main(int argc, char* argv[])
     auto read_dir      = input.getString("read_dir",".");
     auto read_file     = input.getString("read_file","");
 
-    auto [sweepss, upto_ms] = read_sweeps (infile, "sweeps");
-    auto DMRG_sweeps        = iutility::Read_sweeps (infile, "DMRG_sweeps");
+    auto sweeps        = Read_sweeps (infile, "sweeps");
 
     MPS psi;
     MPO H;
+    // Define 
     auto system = WireSystem();
     int step = 1;
     auto sites = MixedBasis();
@@ -365,14 +131,15 @@ int main(int argc, char* argv[])
     // Initialization
     if (!read)
     {
-        // Define basis
+        // Factor for exponential-decay hopping
         Real damp_fac = exp(-1./damp_decay_length);
+        // Single-particle Hamiltonians
         cout << "H left lead" << endl;
         auto H_leadL = Hamilt_k (L_lead, t_lead, mu_leadL, damp_fac, true, true);
         cout << "H right lead" << endl;
         auto H_leadR = Hamilt_k (L_lead, t_lead, mu_leadR, damp_fac, false, true);
         cout << "H dev" << endl;
-        auto H_dev   = Hamilt_k (L_device, t_device, mu_device, 1., true, true);
+        auto H_dev   = Hamilt_k (L_device, t_device, mu_device, damp_fac, true, true);
         auto H_zero  = Matrix(1,1);
 
         // WireSystem
@@ -387,18 +154,17 @@ int main(int argc, char* argv[])
 
         // SiteSet
         int N = system.N();
-        //auto sites = Fermion (N, {"ConserveQNs",ConserveQNs,"ConserveNf",ConserveNf});
         int charge_site = system.to_glob ("C",1);
         // Find sites in S
-        vector<int> S_sites;
+        vector<int> scatter_sites;
         for(int i = 0; i < system.orbs().size(); i++)
         {
             if (get<0>(system.orbs().at(i)) == "S")
-                S_sites.push_back (i+1);
+                scatter_sites.push_back (i+1);
         }
         // Make SiteSet
-        Args args_basis = {"MaxOcc",maxCharge,"SC_scatter",SC_scatter};
-        sites = MixedBasis (N, S_sites, charge_site, args_basis);
+        Args args_basis = {"MaxOcc",maxCharge,"SC_scatter",(Delta != 0.)};
+        sites = MixedBasis (N, scatter_sites, charge_site, args_basis);
         cout << "charge site = " << charge_site << endl;
 
         // Make Hamiltonian MPO
@@ -411,9 +177,14 @@ int main(int argc, char* argv[])
         cout << "MPO dim = " << maxLinkDim(H) << endl;
 
         // Initialze MPS
-        psi = get_ground_state_SC (system, sites, mu_biasL, mu_biasS, mu_biasR, para, DMRG_sweeps, args_basis);
+        if (Delta != 0.)
+        {
+            auto DMRG_sweeps = Read_sweeps (infile, "DMRG_sweeps");
+            psi = get_ground_state_SC (system, sites, mu_biasL, mu_biasS, mu_biasR, para, DMRG_sweeps, args_basis);
+        }
+        else
+            psi = get_non_inter_ground_state (system, sites, mu_biasL, mu_biasS, mu_biasR);
         psi.position(1);
-        cout << "MPS dim = " << maxLinkDim(psi) << endl;
     }
     else
     {
@@ -454,6 +225,7 @@ int main(int argc, char* argv[])
 
     // Time evolution
     cout << "Start time evolution" << endl;
+    cout << sweeps << endl;
     psi.position(1);
     Real en, err;
     Args args_tdvp_expansion = {"Cutoff",globExpanCutoff, "Method","DensityMatrix",
@@ -461,23 +233,12 @@ int main(int argc, char* argv[])
     Args args_tdvp  = {"Quiet",true,"NumCenter",NumCenter,"DoNormalize",true,"Truncate",Truncate,
                        "UseSVD",UseSVD,"SVDmethod",SVDmethod,"WriteDim",WriteDim,"mixNumCenter",mixNumCenter};
     LocalMPO PH (H, args_tdvp);
-    int sweep_i_pre = -1;
-    Sweeps sweeps;
     while (step <= time_steps)
     {
         cout << "step = " << step << endl;
 
-        int m = maxLinkDim(psi);
-        int iswp = get_sweeps_i (m, sweepss, upto_ms);
-        if (sweep_i_pre != iswp)
-        {
-            sweeps = sweepss.at(iswp);
-            cout << sweeps << endl;
-            sweep_i_pre = iswp;
-        }
-
         // Subspace expansion
-        if (m < sweeps.mindim(1) or (step < globExpanN and (step-1) % globExpanItv == 0))
+        if (maxLinkDim(psi) < sweeps.mindim(1) or (step < globExpanN and (step-1) % globExpanItv == 0))
         {
             timer["glob expan"].start();
             addBasis (psi, H, globExpanHpsiCutoff, globExpanHpsiMaxDim, args_tdvp_expansion);

@@ -68,7 +68,8 @@ class WireSystem
         int   N       () const;
         int   N_phys  () const { return has_part("C") ? N()-1 : N(); }
         int   idevL   () const { return _parts.at("L").L()+1; }
-        int   idevR   () const { return _parts.at("L").L()+_parts.at("S").L()+_parts.at("C").L(); }
+        int   idevR   () const { if (has_part("C")) return _parts.at("L").L()+_parts.at("S").L()+_parts.at("C").L(); 
+                                 else return _parts.at("L").L()+_parts.at("S").L(); }
 
         template <typename SortFunction, typename... FuncArgs>
         void sort_basis (SortFunction sort_func, FuncArgs... args);
@@ -171,7 +172,6 @@ void add_CdagC (AutoMPO& ampo, const WireSystem& sys, const string& p1, const st
     const auto& chain2 = sys.parts().at(p2);
     if (i1 < 0) i1 += chain1.L()+1;
     if (i2 < 0) i2 += chain2.L()+1;
-
     auto terms = CdagC_terms (chain1, chain2, i1, i2, coef);
 
     // 
@@ -180,11 +180,14 @@ void add_CdagC (AutoMPO& ampo, const WireSystem& sys, const string& p1, const st
     string op_charge = "";
     if (has_charging)
     {
-        if (p1 != "S" and p2 == "S")      // Cdag_R C_S
+        if ((p1 == "L" and p2 == "S") or    // Cdag_L C_S
+            (p1 == "R" and p2 == "S"))      // Cdag_R C_S
         {
             op_charge = "A";
         }
-        else if (p1 == "S" and p2 != "S")
+        else
+        if ((p1 == "S" and p2 == "L") or    // Cdag_S C_L
+            (p1 == "S" and p2 == "R"))      // Cdag_S C_R
         {
             op_charge = "Adag";
         }
@@ -197,7 +200,6 @@ void add_CdagC (AutoMPO& ampo, const WireSystem& sys, const string& p1, const st
         // hopping
         if (op_charge != "")
         {
-//cout << "* " << coef << " " << op1 << " " << j1 << " " << op_charge << " " << jc << " " << op2 << " " << j2 << endl;
             ampo += coef, op1, j1, op_charge, jc, op2, j2;
         }
         else
@@ -253,19 +255,22 @@ AutoMPO get_ampo (const WireSystem& sys, const SiteType& sites, const Para& para
         add_CdagC (ampo, sys, p2, p1, i2, i1, -t);
     }
     // Charging energy
-    if (sys.has_part("C"))
+    if (sys.has_part("C") and para.Ec != 0.)
     {
         int jc = sys.to_glob ("C",1);
         ampo += para.Ec,"NSqr",jc;
         ampo += para.Ec * para.Ng * para.Ng, "I", jc;
         ampo += -2.*para.Ec * para.Ng, "N", jc;
+//        ampo +=  0.5*para.Ec,"NSqr",jc;
+//        ampo += -0.5*para.Ec,"N",jc;
     }
     // Superconducting
-    Real Delta = para.Delta;
-    auto const& chain = sys.parts().at("S");
-    for(int i = 1; i < chain.L(); i++)
-        add_SC (ampo, sys, "S", "S", i, i+1, Delta);
-
+    if (para.Delta != 0.)
+    {
+        auto const& chain = sys.parts().at("S");
+        for(int i = 1; i < chain.L(); i++)
+            add_SC (ampo, sys, "S", "S", i, i+1, para.Delta);
+    }
     return ampo;
 }
 
