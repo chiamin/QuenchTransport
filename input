@@ -12,6 +12,7 @@ basic
     Delta = 0.5
     Ec = 1
     Ng = 1.3001845407
+    EJ = 0.5
     damp_decay_length = 50
     maxCharge = 5
 

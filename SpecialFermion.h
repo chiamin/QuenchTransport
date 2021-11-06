@@ -13,6 +13,7 @@ class SpecialFermionSite
 
     SpecialFermionSite(Args const& args = Args::global())
     {
+        auto systype = args.getString("SystemType");
         auto ts = TagSet("Site,Fermion");
         auto n = 1;
         if(args.defined("SiteNumber"))
@@ -20,9 +21,9 @@ class SpecialFermionSite
           n = args.getInt("SiteNumber");
           ts.addTags("n="+str(n));
         }
-        auto SC_scatter = args.getBool("SC_scatter");
         auto in_scatter = args.getBool("in_scatter");
-        if (SC_scatter)
+cout << "CCC " << systype << endl;
+        if (systype == "SC_scatter")
         {
             if (in_scatter)
             {
@@ -37,7 +38,7 @@ class SpecialFermionSite
                           Out,ts);
             }
         }
-        else
+        else if (systype == "Normal")
         {
             if (in_scatter)
             {
@@ -51,6 +52,26 @@ class SpecialFermionSite
                           QN({"Nf",1,-1},{"Ns",0,-1}),1,
                           Out,ts);
             }
+        }
+        else if (systype == "SC_Josephson_scatter")
+        {
+            if (in_scatter)
+            {
+                s = Index(QN({"Pf",0,-2},{"Ps",0,-2}),1,
+                          QN({"Pf",0,-2},{"Ps",1,-2}),1,
+                          Out,ts);
+            }
+            else
+            {
+                s = Index(QN({"Pf",0,-2},{"Ps",0,-2}),1,
+                          QN({"Pf",1,-2},{"Ps",0,-2}),1,
+                          Out,ts);
+            }
+        }
+        else
+        {
+            cout << "Unknown system type: " << systype << endl;
+            throw;
         }
     }
 

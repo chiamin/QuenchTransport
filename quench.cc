@@ -25,7 +25,7 @@ using namespace iutility;
 struct Para
 {
     vector<tuple<string,string,int,int,Real>> hops;
-    Real Ec, Ng, Delta;
+    Real Ec=0., Ng=0., Delta=0., EJ=0.;
 
     void write (ostream& s) const
     {
@@ -33,6 +33,7 @@ struct Para
         iutility::write(s,Ec);
         iutility::write(s,Ng);
         iutility::write(s,Delta);
+        iutility::write(s,EJ);
     }
 
     void read (istream& s)
@@ -41,6 +42,7 @@ struct Para
         iutility::read(s,Ec);
         iutility::read(s,Ng);
         iutility::read(s,Delta);
+        iutility::read(s,EJ);
     }
 };
 
@@ -92,6 +94,7 @@ int main(int argc, char* argv[])
     auto Delta      = input.getReal("Delta");
     auto Ec         = input.getReal("Ec");
     auto Ng         = input.getReal("Ng");
+    auto EJ         = input.getReal("EJ");
     auto damp_decay_length = input.getInt("damp_decay_length",10000000);
     auto maxCharge  = input.getInt("maxCharge");
 
@@ -163,12 +166,20 @@ int main(int argc, char* argv[])
                 scatter_sites.push_back (i+1);
         }
         // Make SiteSet
-        Args args_basis = {"MaxOcc",maxCharge,"SC_scatter",(Delta != 0.)};
+        string systype = "Normal";
+        if (Delta != 0.)
+        {
+            if (EJ != 0.)
+                systype = "SC_Josephson_scatter";
+            else
+                systype = "SC_scatter";
+        }
+        Args args_basis = {"MaxOcc",maxCharge,"SystemType",systype};
         sites = MixedBasis (N, scatter_sites, charge_site, args_basis);
         cout << "charge site = " << charge_site << endl;
 
         // Make Hamiltonian MPO
-        para.Ec = Ec;   para.Ng = Ng;   para.Delta = Delta;
+        para.Ec = Ec;   para.Ng = Ng;   para.Delta = Delta;  para.EJ = EJ;
         para.hops.clear();
         para.hops.emplace_back ("L","S",-1,1,t_contactL);
         para.hops.emplace_back ("R","S",1,-1,t_contactR);

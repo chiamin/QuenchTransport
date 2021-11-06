@@ -16,7 +16,7 @@ class SpecialBosonSite
 
     SpecialBosonSite(Args const& args = Args::global())
     {
-        auto SC_scatter = args.getBool("SC_scatter");
+        auto systype = args.getString("SystemType");
 
         auto tags = TagSet("Site,Boson");
         if (args.defined("SiteNumber"))
@@ -30,17 +30,28 @@ class SpecialBosonSite
             _ns.push_back (n);
 
         auto qints = Index::qnstorage(_ns.size());
+cout << "BBB " << systype << endl;
         for(int i = 0; i < _ns.size(); i++)
         {
             int n = _ns.at(i);
-            if(SC_scatter)
+            if(systype == "SC_scatter")
             {
                 int p = n % 2;
                 qints[i] = QNInt(QN({"Nf",n,-1},{"Ps",p,-2}),1);
             }
-            else
+            else if (systype == "Normal")
             {
                 qints[i] = QNInt(QN({"Nf",0,-1},{"Ns",-n,-1}),1);
+            }
+            else if (systype == "SC_Josephson_scatter")
+            {
+                int p = n % 2;
+                qints[i] = QNInt(QN({"Pf",p,-2},{"Ps",p,-2}),1);
+            }
+            else
+            {
+                cout << "Unknown system type: " << systype << endl;
+                throw;
             }
         }
         s = Index(std::move(qints),Out,tags);
@@ -98,6 +109,20 @@ class SpecialBosonSite
             for(int i = 1; i < _ns.size(); i++)
             {
                 Op.set(s=i,sP=1+i,1);
+            }
+        }
+        else if(opname == "A2")
+        {
+            for(int i = 3; i <= _ns.size(); i++)
+            {
+                Op.set(s=i,sP=i-2,1);
+            }
+        }
+        else if(opname == "A2dag")
+        {
+            for(int i = 3; i <= _ns.size(); i++)
+            {
+                Op.set(s=i-2,sP=i,1);
             }
         }
         else if(opname == "I")

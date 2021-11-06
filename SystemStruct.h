@@ -271,6 +271,13 @@ AutoMPO get_ampo (const WireSystem& sys, const SiteType& sites, const Para& para
         for(int i = 1; i < chain.L(); i++)
             add_SC (ampo, sys, "S", "S", i, i+1, para.Delta);
     }
+    // Josephson hopping
+    if (para.EJ != 0.)
+    {
+        int jc = sys.to_glob ("C",1);
+        ampo += para.EJ,"A2",jc;
+        ampo += para.EJ,"A2dag",jc;
+    }
     return ampo;
 }
 
