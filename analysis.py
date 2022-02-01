@@ -64,12 +64,14 @@ def get_data (fname):
     idevL, idevR = get_para (fname, 'device site', int, n=2)
     iC = get_para (fname, 'charge site', int)
     hopt = get_hop_t (fname)
+    maxnC = get_para (fname, 'maxCharge', int)
 
     Is = np.full ((Nstep,L), np.nan)
     Is_spec = np.full ((Nstep,L-1), np.nan)
     ns = np.full ((Nstep,L+1), np.nan)
     Ss = np.full ((Nstep,L+1), np.nan)
     dims = np.full ((Nstep,L), np.nan)
+    nCs = np.full ((Nstep,2*maxnC+1), np.nan)
     with open(fname) as f:
         for line in f:
             line = line.lstrip()
@@ -100,7 +102,18 @@ def get_data (fname):
                 i = int(tmp[1])
                 m = float(tmp[-1])
                 dims[step-1,i-1] = m
-    return Is, Is_spec, ns, Ss, dims
+            elif line.startswith('*nC'):
+                tmp = line.split()
+                n = int(tmp[-2])
+                nC = float(tmp[-1])
+                nCs[step-1,n+maxnC] = nC
+    # Is: current, currently not used
+    # Is_spec: current on the special links
+    # ns: occupasion
+    # Ss: entanglement entropy
+    # dims: bond dimension
+    # nCs: distribution on the charge site
+    return Is, Is_spec, ns, Ss, dims, nCs
 
 def plot_prof (ax, data, dt, label=''):
     Nstep, L = np.shape(data)
@@ -153,7 +166,7 @@ if __name__ == '__main__':
         en_basis, segs = get_basis (fname)
 
         # Get data
-        Is, Is_spec, ns, Ss, dims = get_data (fname)
+        Is, Is_spec, ns, Ss, dims, nCs = get_data (fname)
         dt = get_para (fname, 'dt', float)
         m = get_para (fname, 'Largest link dim', int)
         Nstep, L = np.shape(Is)
@@ -234,6 +247,19 @@ if __name__ == '__main__':
         f3,ax3 = pl.subplots()
         ax3.plot (ts, N_dev, marker='.')
         ps.set(ax3)'''
+
+        f,ax = pl.subplots()
+        maxnC = get_para (fname, 'maxCharge', int)
+        cs = range(-maxnC,maxnC+1)
+        for i in range(len(cs)):
+            ax.plot (ts, nCs[:,i], label='n='+str(cs[i]));
+        #plot_time_slice (ax, nCs, n=5, xs=range(-maxnC,maxnC+1), marker='.', ls='None')
+        #ax.set_xlabel ('$n_C$')
+        ax.set_xlabel ('time')
+        ax.set_ylabel ('occupassion')
+        #ps.set_tick_inteval (ax.xaxis, 1)
+        ax.legend()
+        ps.set(ax)
 
         # current vs time
         muL = get_para (fname, 'mu_biasL', float)

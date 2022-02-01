@@ -1,18 +1,19 @@
 #ifndef __SORTBASIS_H_CMC__
 #define __SORTBASIS_H_CMC__
-#include "NonInterChain.h"
+#include "BasisVisitor.h"
 
 using BasisInfo = tuple <string, int, Real>; // segment name, orbital index, energy
 
-// Input: arbitrary number of NonInterChain objects
+// Input: arbitrary number of bases
 // Combine all the basis states and sort by the energies
-vector<BasisInfo> sort_by_energy (std::initializer_list<NonInterChain> chains)
+template <typename BasisType>
+vector<BasisInfo> sort_by_energy (std::initializer_list<BasisType> chains)
 {
     vector<BasisInfo> orbs;
     for(auto const& chain : chains)
     {
-        for(int i = chain.L(); i > 0; i--)
-            orbs.emplace_back (chain.name(), i, chain.ens()(i-1));
+        for(int i = visit (basis::size(), chain); i > 0; i--)
+            orbs.emplace_back (visit (basis::name(), chain), i, visit (basis::en(i), chain));
     }
     // Sort the orbitals based on the energies
     auto sort_func = [] (const BasisInfo& s1, const BasisInfo& s2)
@@ -24,9 +25,10 @@ vector<BasisInfo> sort_by_energy (std::initializer_list<NonInterChain> chains)
 }
 
 // Sort all the basis states by energy; however put the states from <chainS> in zero energy of the other states
+template <typename SysBasis, typename LeadBasis>
 vector<BasisInfo>
 sort_by_energy_S_middle
-(const NonInterChain& chainS, std::initializer_list<NonInterChain> other_chains)
+(const SysBasis& chainS, std::initializer_list<LeadBasis> other_chains)
 {
     auto orb_S = sort_by_energy ({chainS});
     auto orbs = sort_by_energy (other_chains);
@@ -40,9 +42,10 @@ sort_by_energy_S_middle
     return orbs;
 }
 
+template <typename SysBasis, typename LeadBasis, typename ChargeBasis>
 vector<BasisInfo>
 sort_by_energy_S_middle_charging
-(const NonInterChain& chainS, const NonInterChain& chainC, std::initializer_list<NonInterChain> other_chains)
+(const SysBasis& chainS, const LeadBasis& chainC, std::initializer_list<ChargeBasis> other_chains)
 {
     auto orb_C = sort_by_energy ({chainC});
     auto orbs = sort_by_energy_S_middle (chainS, other_chains);

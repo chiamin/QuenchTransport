@@ -12,7 +12,12 @@ class SpecialBosonSite
 
     int n (int i) const { return _ns.at(i-1); }
 
-    SpecialBosonSite(Index I) : s(I) { }
+    SpecialBosonSite(Index I, Args const& args = Args::global()) : s(I)
+    {
+        auto maxOcc = args.getInt("MaxOcc");
+        for(int n = -maxOcc; n <= maxOcc; n++)
+            _ns.push_back (n);
+    }
 
     SpecialBosonSite(Args const& args = Args::global())
     {
@@ -30,7 +35,6 @@ class SpecialBosonSite
             _ns.push_back (n);
 
         auto qints = Index::qnstorage(_ns.size());
-cout << "BBB " << systype << endl;
         for(int i = 0; i < _ns.size(); i++)
         {
             int n = _ns.at(i);

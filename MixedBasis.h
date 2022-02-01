@@ -42,7 +42,7 @@ class MixedBasis : public SiteSet
         SiteSet::init(std::move(sites));
     }
 
-    MixedBasis (IndexSet const& is)
+    MixedBasis (IndexSet const& is, Args const& args=Args::global())
     {
         int N = is.length();
         auto sites = SiteStore(N);
@@ -52,7 +52,7 @@ class MixedBasis : public SiteSet
             mycheck (hasTags(ii,"Boson") or hasTags(ii,"Fermion"), "unknown site index");
             if (hasTags(ii,"Boson"))
             {
-                sites.set(j,SpecialBosonSite(ii));
+                sites.set(j,SpecialBosonSite(ii,args));
                 int d = dim(ii);
                 _maxOcc = (d-1)/2;
             }

@@ -67,6 +67,7 @@ void TDVPObserver<SitesType> :: measure (const Args& args)
     {
         // Density
         ITensor n_op = noPrime (psi().A(oc) * _sites.op("N",oc), "Site");
+
         n_op *= dag(psi().A(oc));
         Real ni = real(eltC(n_op));
         cout << "\t*den " << oc << " " << ni << endl;

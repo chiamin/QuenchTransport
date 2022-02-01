@@ -13,6 +13,7 @@ MPO get_current_mpo (const SiteType& sites, const WireSystem& sys, int i, Real c
     auto [partR, i2] = get_loc (sys, i+1);
     AutoMPO ampo (sites);
     add_CdagC (ampo, sys, partL, partR, i1, i2, 1.);
+//cout << "cur " << partL << " " << partR << " " << i1 << " " << i2 << endl;
     auto mpo = toMPO (ampo);
     return mpo;
 }
@@ -31,6 +32,7 @@ MPO get_current_N_mpo (const SiteType& sites, const WireSystem& sys, int i, Real
 Real get_current (const MPO& JMPO, const MPS& psi)
 {
     auto J = innerC (psi, JMPO, psi);
+//cout << "J " << J << endl;
     return -2. * imag(J);
 }
 /*

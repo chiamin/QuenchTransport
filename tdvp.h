@@ -199,6 +199,7 @@ TDVPWorker(MPS & psi,
 
     args.add("DebugLevel",debug_level);
 
+    bool write_to_disk = false;
     for(int sw = 1; sw <= sweeps.nsweep(); ++sw)
     {
         int numCenter = args.getInt("NumCenter",2);
@@ -219,9 +220,12 @@ TDVPWorker(MPS & psi,
             is_maxdim = reach_max_dim (psi, args.getInt("MaxDim"));
         } 
 
+        if (!write_to_disk and maxLinkDim (psi) >= args.getInt("WriteDim"))
+            write_to_disk = true;
         if(!H.doWrite()
            && args.defined("WriteDim")
-           && sweeps.maxdim(sw) >= args.getInt("WriteDim"))
+           && sweeps.maxdim(sw) >= args.getInt("WriteDim")
+           && write_to_disk)
             {
             if(!quiet)
                 {

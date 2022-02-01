@@ -6,7 +6,6 @@ Timers timer;
 #include "IUtility.h"
 #include "MyObserver.h"
 #include "MPSUtility.h"
-#include "SingleParticle.h"
 #include "MixedBasis.h"
 #include "SystemStruct.h"
 #include "ContainerUtility.h"
@@ -50,11 +49,13 @@ void writeAll (const string& filename,
                const MPS& psi, const MPO& H,
                const WireSystem& system,
                const Para& para,
+               const Args& args_basis,
                int step)
 {
     ofstream ofs (filename);
     itensor::write (ofs, psi);
     itensor::write (ofs, H);
+    itensor::write (ofs, args_basis);
     itensor::write (ofs, step);
     para.write (ofs);
     system.write (ofs);
@@ -64,14 +65,45 @@ void readAll (const string& filename,
               MPS& psi, MPO& H,
               WireSystem& system,
               Para& para,
+              Args& args_basis,
               int& step)
 {
     ifstream ifs = open_file (filename);
     itensor::read (ifs, psi);
     itensor::read (ifs, H);
+    itensor::read (ifs, args_basis);
     itensor::read (ifs, step);
     para.read (ifs);
     system.read (ifs);
+}
+
+template <typename SiteType>
+MPS apply (const SiteType& sites, MPS psi, Real coef, string opstr, int i)
+{
+    for(int j = 1; j <= i; j++)
+    {
+        auto op = (j == i ? coef*sites.op (opstr, j) : sites.op ("F", j));
+        psi.ref(j) *= op;
+        psi.ref(j).noPrime("Site");
+    }
+    psi.position(1);
+    return psi;
+}
+
+template <typename SiteType>
+MPS apply_ops (const SiteType& sites, MPS psi, const vector<tuple<int,auto,bool>>& ops)
+{
+    MPS re;
+    for(auto [k, coef, dag] : ops)
+    {
+        string op = (dag ? "Cdag" : "C");
+        auto tmp = apply (sites, psi, coef, op, k);
+        if (!re)
+            re = tmp;
+        else if (norm(tmp) != 0.)
+            re.plusEq (tmp);
+    }
+    return re;
 }
 
 int main(int argc, char* argv[])
@@ -124,13 +156,16 @@ int main(int argc, char* argv[])
 
     auto sweeps        = Read_sweeps (infile, "sweeps");
 
+    cout << setprecision(14) << endl;
+
     MPS psi;
     MPO H;
     // Define 
-    auto system = WireSystem();
+    auto glob_basis = WireSystem ();
     int step = 1;
     auto sites = MixedBasis();
     Para para;
+    Args args_basis;
     // Initialization
     if (!read)
     {
@@ -138,31 +173,33 @@ int main(int argc, char* argv[])
         Real damp_fac = exp(-1./damp_decay_length);
         // Single-particle Hamiltonians
         cout << "H left lead" << endl;
-        auto H_leadL = Hamilt_k (L_lead, t_lead, mu_leadL, damp_fac, true, true);
+        Basis leadL = OneParticleBasis ("L", L_lead, t_lead, mu_leadL, damp_fac, true, true);
         cout << "H right lead" << endl;
-        auto H_leadR = Hamilt_k (L_lead, t_lead, mu_leadR, damp_fac, false, true);
+        Basis leadR = OneParticleBasis ("R", L_lead, t_lead, mu_leadR, damp_fac, false, true);
         cout << "H dev" << endl;
-        auto H_dev   = Hamilt_k (L_device, t_device, mu_device, damp_fac, true, true);
-        auto H_zero  = Matrix(1,1);
+        //Basis system = OneParticleBasis ("S", L_device, t_device, mu_device, damp_fac, true, true);
+        Basis system = BdGBasis ("S", L_device, t_device, mu_device, Delta);
+        Basis charge = OneParticleBasis ("C", 1);
 
         // WireSystem
-        system.add_chain ("L",H_leadL);
-        system.add_chain ("R",H_leadR);
-        system.add_chain ("S",H_dev);
-        system.add_chain ("C",H_zero);
-        //system.sort_basis (sort_by_energy_S_middle (system.part("S"), {system.part("L"), system.part("R")}));
-        system.sort_basis (sort_by_energy_S_middle_charging (system.parts().at("S"), system.parts().at("C"), {system.parts().at("L"), system.parts().at("R")}));
-        system.print_orbs();
-        cout << "device site = " << system.idevL() << " " << system.idevR() << endl;
+        glob_basis.add_partition ("L",leadL);
+        glob_basis.add_partition ("R",leadR);
+        glob_basis.add_partition ("S",system);
+        glob_basis.add_partition ("C",charge);
+        //glob_basis.sort_basis (sort_by_energy_S_middle (system.part("S"), {system.part("L"), system.part("R")}));
+        glob_basis.sort_basis (sort_by_energy_S_middle_charging (glob_basis.parts().at("S"), glob_basis.parts().at("C"),
+                               {glob_basis.parts().at("L"), glob_basis.parts().at("R")}));
+        glob_basis.print_orbs();
+        cout << "device site = " << glob_basis.idevL() << " " << glob_basis.idevR() << endl;
 
         // SiteSet
-        int N = system.N();
-        int charge_site = system.to_glob ("C",1);
+        int N = glob_basis.N();
+        int charge_site = glob_basis.to_glob ("C",1);
         // Find sites in S
         vector<int> scatter_sites;
-        for(int i = 0; i < system.orbs().size(); i++)
+        for(int i = 0; i < glob_basis.orbs().size(); i++)
         {
-            if (get<0>(system.orbs().at(i)) == "S")
+            if (get<0>(glob_basis.orbs().at(i)) == "S")
                 scatter_sites.push_back (i+1);
         }
         // Make SiteSet
@@ -174,7 +211,7 @@ int main(int argc, char* argv[])
             else
                 systype = "SC_scatter";
         }
-        Args args_basis = {"MaxOcc",maxCharge,"SystemType",systype};
+        args_basis = {"MaxOcc",maxCharge,"SystemType",systype};
         sites = MixedBasis (N, scatter_sites, charge_site, args_basis);
         cout << "charge site = " << charge_site << endl;
 
@@ -183,7 +220,7 @@ int main(int argc, char* argv[])
         para.hops.clear();
         para.hops.emplace_back ("L","S",-1,1,t_contactL);
         para.hops.emplace_back ("R","S",1,-1,t_contactR);
-        auto ampo = get_ampo (system, sites, para);
+        auto ampo = get_ampo (glob_basis, sites, para);
         H = toMPO (ampo);
         cout << "MPO dim = " << maxLinkDim(H) << endl;
 
@@ -191,31 +228,36 @@ int main(int argc, char* argv[])
         if (Delta != 0.)
         {
             auto DMRG_sweeps = Read_sweeps (infile, "DMRG_sweeps");
-            psi = get_ground_state_SC (system, sites, mu_biasL, mu_biasS, mu_biasR, para, DMRG_sweeps, args_basis);
+            //psi = get_ground_state_SC (glob_basis, sites, mu_biasL, mu_biasS, mu_biasR, para, DMRG_sweeps, args_basis);
+            psi = get_ground_state_BdG_scatter (glob_basis, sites, mu_biasL, mu_biasS, mu_biasR, para, maxCharge);
         }
         else
-            psi = get_non_inter_ground_state (system, sites, mu_biasL, mu_biasS, mu_biasR);
+            psi = get_non_inter_ground_state (glob_basis, sites, mu_biasL, mu_biasS, mu_biasR);
         psi.position(1);
+
+        // Check initial energy
+        cout << "Initial energy = " << inner (psi,H,psi) << endl;
+
     }
     else
     {
-        readAll (read_dir+"/"+read_file, psi, H, system, para, step);
-        sites = MixedBasis (siteInds(psi));
+        readAll (read_dir+"/"+read_file, psi, H, glob_basis, para, args_basis, step);
+        sites = MixedBasis (siteInds(psi), args_basis);
     }
     // ======================= Time evolution ========================
     // Observer
-    auto obs = TDVPObserver (sites, psi, {"charge_site",system.to_glob ("C",1)});
+    auto obs = TDVPObserver (sites, psi, {"charge_site",glob_basis.to_glob ("C",1)});
     // Current MPO
-    int lenL = system.parts().at("L").L();
-    int lenS = system.parts().at("S").L();
+    int lenL = visit (basis::size(), glob_basis.parts().at("L"));
+    int lenS = visit (basis::size(), glob_basis.parts().at("S"));
     vector<int> spec_links = {lenL-1, lenL+lenS+1};
-    /*for(int i = 1; i < system.N_phys(); i++)
+    /*for(int i = 1; i < glob_basis.N_phys(); i++)
         spec_links.push_back (i);*/
-    int N = system.N();
+    int N = glob_basis.N();
     vector<MPO> JMPOs (N);
     for(int i : spec_links)
     {
-        auto mpo = get_current_mpo (sites, system, i);
+        auto mpo = get_current_mpo (sites, glob_basis, i);
         JMPOs.at(i) = mpo;
     }
     // Correlation
@@ -232,7 +274,7 @@ int main(int argc, char* argv[])
     int l = (N - SubCorrN) / 2;
     int ibeg = l+1,
         iend = l+SubCorrN;
-    auto sub_corr = SubCorr (system, ibeg, iend);*/
+    auto sub_corr = SubCorr (glob_basis, ibeg, iend);*/
 
     // Time evolution
     cout << "Start time evolution" << endl;
@@ -256,6 +298,7 @@ int main(int argc, char* argv[])
             PH.reset();
             timer["glob expan"].stop();
         }
+
         // Time evolution
         timer["tdvp"].start();
         //tdvp (psi, H, 1_i*dt, sweeps, obs, args_tdvp);
@@ -267,7 +310,7 @@ int main(int argc, char* argv[])
         /*timer["current corr"].start();
         sub_corr.measure<MixedBasis> (psi, {"Cutoff",corr_cutoff});
         timer["current corr"].stop();
-        for(int j = 1; j < system.N_phys(); j++)
+        for(int j = 1; j < glob_basis.N_phys(); j++)
         {
             timer["current corr"].start();
             auto J = sub_corr.get_current (j);
@@ -283,16 +326,16 @@ int main(int argc, char* argv[])
             cout << "\t*I " << j << " " << j+1 << " " << J << endl;
         }
 
-        Real NN = den (sites, psi, 1, system.idevL()-1);
-        NN += den (sites, psi, system.idevL()+1, length(sites));
-        NN += den (sites, psi, system.to_glob ("C",1));
+        Real NN = den (sites, psi, 1, glob_basis.idevL()-1);
+        NN += den (sites, psi, glob_basis.idevL()+1, length(sites));
+        NN += den (sites, psi, glob_basis.to_glob ("C",1));
         cout << "tot N = " << NN << endl;
 
         step++;
         if (write)
         {
             timer["write"].start();
-            writeAll (write_dir+"/"+write_file, psi, H, system, para, step);
+            writeAll (write_dir+"/"+write_file, psi, H, glob_basis, para, args_basis, step);
             timer["write"].stop();
         }
     }

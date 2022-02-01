@@ -1,34 +1,36 @@
 basic
 {
     L_lead = 10
-    L_device = 4
+    L_device = 7
     t_lead = 1
-    t_device = 0.1
+    t_device = 0.5
     t_contactL = 0.2
     t_contactR = 0.2
     mu_leadL = 0
     mu_leadR = 0
-    mu_device = -0.5
+    mu_device = 0
     Delta = 0.5
     Ec = 1
-    Ng = 1.3001845407
-    EJ = 0.5
+    Ng = 1.5
+    EJ = 0
     damp_decay_length = 50
     maxCharge = 5
+
+    SC_scatter = yes
 
     mu_biasL = 0.025
     mu_biasS = 0
     mu_biasR = -0.025
-    dt = 0.25
-    time_steps = 80
+    dt = 1
+    time_steps = 200
 
     NumCenter = 1
     mixNumCenter = no
-    globExpanN = 100
+    globExpanN = 10000
     globExpanItv = 1
     globExpanCutoff = 1e-4
     globExpanKrylovDim = 2
-    globExpanHpsiCutoff = 1e-10
+    globExpanHpsiCutoff = 1e-14
     globExpanHpsiMaxDim = 100
     globExpanMethod = Fit
     Truncate = yes
@@ -36,11 +38,11 @@ basic
     SubCorrN = 1000
     corr_cutoff = 1e-12
 
-    write = yes
-    write_dir = .
+    write = no
+    write_dir = /nbi/user-scratch/s/swp778/conductance/data/majorana/ec/mu0.1_Ec0.5_Delta0.5/Ng0.5/Vb0.05
     write_file = timeevol.save
     read = no
-    read_dir = .
+    read_dir = /nbi/user-scratch/s/swp778/conductance/data/majorana/ec/mu0.1_Ec0.5_Delta0.5/Ng0.5/Vb0.05
     read_file = timeevol.save
 
     verbose = yes
@@ -59,6 +61,6 @@ basic
     sweeps
     {
         maxm   minm   cutoff   niter  noise    nsweep
-        128    16     1E-6     20     0        1
+        2000   16     1E-7     30     0        1
     }
 }

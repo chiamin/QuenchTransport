@@ -2,6 +2,131 @@
 #define __INITSTATE_H_CMC__
 #include "SystemStruct.h"
 
+// The charging energy is Ec * (N - Ng)^2
+// Find out N that lowest the charging energy in even and odd number of particle sectors
+tuple <Real,Real,int,int> en_charging_energy (int maxOcc, Real Ec, Real Ng)
+{
+    Real en_even = std::numeric_limits<double>::max(),
+         en_odd  = std::numeric_limits<double>::max();
+    vector<int> ns (1,0);
+    for(int n = 1; n <= maxOcc; n++)
+    {
+        ns.push_back (n);
+        ns.push_back (-n);
+    }
+    int n_even, n_odd;
+    for(int n : ns)
+    {
+        // Compute charging energy
+        Real nn = n - Ng;
+        Real enC = Ec * nn*nn;
+        // 
+        if (n % 2 == 0 and enC < en_even)
+        {
+            en_even = enC;
+            n_even = n;
+        }
+        if (n % 2 == 1 and enC < en_odd)
+        {
+            en_odd = enC;
+            n_odd = n;
+        }
+    }
+    return {en_even, en_odd, n_even, n_odd};
+}
+
+template <typename SiteType, typename Para>
+MPS get_ground_state_BdG_scatter (const WireSystem& sys, const SiteType& sites, Real muL, Real muS, Real muR, const Para& para, int maxOcc)
+{
+    mycheck (length(sites) == sys.N(), "size not match");
+    // Get the ground state for SC (even particle number)
+    vector<string> state (sys.N()+1);
+    map<string,Real> mu {{"L",muL}, {"R",muR}, {"S",muS}};
+    Real E = 0.;
+    for(int i = 1; i <= length(sites); i++)
+    {
+        auto [p, k] = sys.to_loc (i);
+        if (p == "L" or p == "R")
+        {
+            auto const& en = visit (basis::en(k), sys.parts().at(p));
+            if (en < mu.at(p))
+                state.at(i) = "Occ";
+            else
+                state.at(i) = "Emp";
+            E += en;
+        }
+        else if (p == "S")
+        {
+            state.at(i) = "Emp";
+        }
+        else if (p == "C")
+        {
+//            state.at(i) = "0";
+        }
+        else
+        {
+            cout << "Unknown partition:" << p << endl;
+            throw;
+        }
+    }
+    sys.print_orbs();
+
+    // Superconducting gap
+    Real SC_gap = visit (basis::en(1), sys.parts().at("S"));
+    cout << "SC gap = " << SC_gap << endl;
+
+
+    // Capacity site
+    // Find out the charge numbers, which are integers, that lowest the charging energy, for even and odd parities
+    auto [enC0, enC1, n_even, n_odd] = en_charging_energy (maxOcc, para.Ec, para.Ng);
+    // Combine the scatter energies to decide to choose even or odd sector
+    Real en0 = enC0,
+         en1 = enC1 + SC_gap;
+    cout << "n (even,odd) = " << n_even << ", " << n_odd << endl;
+    cout << "E (even,odd) = " << en0 << ", " << en1 << endl;
+    if (en1 < en0) // First excited state in superconductor
+    {
+        int is1 = sys.to_glob ("S",1);
+        state.at(is1) = "Occ";
+        cout << "Ground state has odd parity" << endl;
+    }
+    else
+    {
+        cout << "Ground state has even parity" << endl;
+    }
+    int  n   = (en0 <= en1 ? n_even : n_odd);
+    cout << "Initial charge = " << n << endl;
+    // Set the charge site
+    int ic = sys.to_glob ("C",1);
+    state.at(ic) = str(n);
+    // Set state
+    InitState init (sites);
+    for(int i = 1; i <= sys.N(); i++)
+        init.set (i, state.at(i));
+
+    auto psi = MPS (init);
+/*
+    // If Majorana zero mode exists, use the equal-weight superposition of occupied and unoccupied state
+    auto const& en = visit (basis::en(1), sys.parts().at("S"));
+    if (abs(en) < 1e-14)
+    {
+        int iglob = sys.to_glob ("S",1);
+        auto A = psi(iglob);
+        auto links = findInds (A, "Link");
+        auto il1 = links(1);
+        auto il2 = links(2);
+        auto is  = findIndex (A, "Site");
+        mycheck (dim(il1) == 1 and dim(il2) == 1, "Link indices dimension error");
+        Real ele = 1./sqrt(2);
+        A.set (il1=1, il2=1, is=1, ele);
+        A.set (il1=1, il2=1, is=2, ele);
+        psi.ref(iglob) = A;
+        PrintData(psi(iglob));
+    }
+exit(0);*/
+    return psi;
+}
+
 template <typename SiteType>
 MPS get_non_inter_ground_state (const WireSystem& sys, const SiteType& sites, Real muL=0., Real muS=0., Real muR=0.)
 {
@@ -16,9 +141,9 @@ MPS get_non_inter_ground_state (const WireSystem& sys, const SiteType& sites, Re
         if (p == "L")      mu = muL;
         else if (p == "R") mu = muR;
         else if (p == "S") mu = muS;
-        for(int i = 1; i <= chain.L(); i++)
+        for(int i = 1; i <= visit (basis::size(), chain); i++)
         {
-            auto const& en = chain.ens()(i-1);
+            auto const& en = visit (basis::en(i), chain);
             int j = sys.to_glob (p, i);
             if (en-mu < 0.)
             {
@@ -33,13 +158,14 @@ MPS get_non_inter_ground_state (const WireSystem& sys, const SiteType& sites, Re
     // Capacity site
     {
         int j = sys.to_glob ("C",1);
-        state.at(j) = str(Ns);
+        state.at(j) = "0";
     }
 
     InitState init (sites);
     for(int i = 1; i <= sys.N(); i++)
         init.set (i, state.at(i));
 
+    // Print information
     cout << "orbitals, segment, ki, energy, state" << endl;
     for(int i = 1; i <= sys.orbs().size(); i++)
     {
@@ -57,11 +183,11 @@ get_scatter_ground_state_SC
  const Sweeps& sweeps, const Args& args)
 {
     auto chain = sys.parts().at("S");
-    SpecialFermion sites (chain.L(), {args,"in_scatter",true});
+    SpecialFermion sites (visit (basis::size(), chain), {args,"in_scatter",true});
 
     // Find the first site of the scatter
     int imin = std::numeric_limits<int>::max();
-    for(auto [coef, op, i] : chain.ops())
+    for(int i = 1; i <= visit(basis::size(),chain); i++)
     {
         int j = sys.to_glob ("S",i);
         if (imin > j)
@@ -71,26 +197,31 @@ get_scatter_ground_state_SC
     int L_offset = imin-1;
     AutoMPO ampo (sites);
     // Diagonal terms
-    for(auto [coef, op, i] : chain.ops())
+    for(int i = 1; i <= visit(basis::size(),chain); i++)
     {
         int j = sys.to_glob ("S",i)-L_offset;
-        ampo += coef-mu, op, j;
+        auto en = visit (basis::en(i), chain);
+        ampo += en-mu, "N", j;
     }
     // Superconducting
     string p = "S";
-    for(int i = 1; i < chain.L(); i++)
+    for(int i = 1; i < visit (basis::size(), chain); i++)
     {
-        auto terms = quadratic_term_coefs<Real> (chain, chain, i, i+1, false, false);
-        for(auto [c12, k1, k2] : terms)
+        auto terms = quadratic_operator (chain, chain, i, i+1, false, false);
+        for(auto [c12, k1, dag1, k2, dag2] : terms)
         {
             int j1 = sys.to_glob (p,k1) - L_offset;
             int j2 = sys.to_glob (p,k2) - L_offset;
             if (j1 != j2)
             {
                 auto c = Delta * c12;
-                auto cc = iutility::conjT (c);
-                ampo += -c, "C", j1, "C", j2;
-                ampo += -cc, "Cdag", j2, "Cdag", j1;
+                auto cc = iut::conj (c);
+                string op1 = (dag1 ? "Cdag" : "C");
+                string op2 = (dag2 ? "Cdag" : "C");
+                string op1dag = (dag1 ? "C" : "Cdag");
+                string op2dag = (dag2 ? "C" : "Cdag");
+                ampo += -c, op1, j1, op2, j2;
+                ampo += -cc, op1dag, j2, op2dag, j1;
             }
         }
     }
@@ -130,9 +261,9 @@ MPS get_ground_state_SC (const WireSystem& sys, const SiteType& sites,
     {
         auto const& chain = sys.parts().at(p);
         Real mu = (p == "L" ? muL : muR);
-        for(int i = 1; i <= chain.L(); i++)
+        for(int i = 1; i <= visit (basis::size(), chain); i++)
         {
-            auto const& en = chain.ens()(i-1);
+            auto const& en = visit (basis::en(i), chain);
             int j = sys.to_glob (p, i);
             if (en-mu < 0.)
             {
@@ -149,32 +280,9 @@ MPS get_ground_state_SC (const WireSystem& sys, const SiteType& sites,
     auto [psi0, psi1, enSC0, enSC1, Np0, Np1, L_offset] = get_scatter_ground_state_SC (sys, muS, para.Delta, sweeps, args);
 
     // Capacity site
-    // Find out the charge numbers, as integers, that lowest the charging energy, for even and odd parities
+    // Find out the charge numbers, which are integers, that lowest the charging energy, for even and odd parities
     int maxOcc = args.getInt("MaxOcc");
-    Real enC0 = std::numeric_limits<double>::max(),
-         enC1 = std::numeric_limits<double>::max();
-    vector<int> ns (1,0);
-    for(int n = 1; n <= maxOcc; n++)
-    {
-        ns.push_back (n);
-        ns.push_back (-n);
-    }
-    int n_even, n_odd;
-    for(int n : ns)
-    {
-        Real nn = n - para.Ng;
-        Real enC = para.Ec * nn*nn;
-        if (n % 2 == 0 and enC < enC0)
-        {
-            enC0 = enC;
-            n_even = n;
-        }
-        if (n % 2 == 1 and enC < enC1)
-        {
-            enC1 = enC;
-            n_odd = n;
-        }
-    }
+    auto [enC0, enC1, n_even, n_odd] = en_charging_energy (maxOcc, para.Ec, para.Ng);
     // Combine the scatter energies to decide to choose even or odd sector
     Real en0 = enC0 + enSC0,
          en1 = enC1 + enSC1;
