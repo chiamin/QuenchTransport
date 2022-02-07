@@ -18,6 +18,7 @@ basic
 
     SC_scatter = yes
 
+    // Can be SC or real_space
     scatter_basis = SC
 
     mu_biasL = 0.025
