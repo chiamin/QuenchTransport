@@ -198,7 +198,7 @@ bool orthogonal_to_particle_hole_transform (const Vector& v)
 {
     Vector w = particle_hole_transform (v);
     auto o = w*v;
-    return (abs(o) < 1e-14);
+    return (abs(o) < 1e-10);
 }
 
 BdGBasis :: BdGBasis (const string& name, int L, Real t, Real mu, Real Delta)
