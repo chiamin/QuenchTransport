@@ -127,7 +127,7 @@ int main(int argc, char* argv[])
     auto Ec         = input.getReal("Ec");
     auto Ng         = input.getReal("Ng");
     auto EJ         = input.getReal("EJ");
-    auto damp_decay_length = input.getInt("damp_decay_length",10000000);
+    auto damp_decay_length = input.getInt("damp_decay_length",0);
     auto maxCharge  = input.getInt("maxCharge");
 
     auto dt            = input.getReal("dt");
@@ -135,7 +135,12 @@ int main(int argc, char* argv[])
     auto NumCenter     = input.getInt("NumCenter");
     auto Truncate      = input.getYesNo("Truncate");
     auto mixNumCenter  = input.getYesNo("mixNumCenter",false);
-    auto globExpanN          = input.getInt("globExpanN",std::numeric_limits<int>::max());
+    auto globExpanNStr       = input.getString("globExpanN","inf");
+    int globExpanN;
+    if (globExpanNStr == "inf" or globExpanNStr == "Inf" or globExpanNStr == "INF")
+        globExpanN = std::numeric_limits<int>::max();
+    else
+        globExpanN = std::stoi (globExpanNStr);
     auto globExpanItv        = input.getInt("globExpanItv",1);
     auto globExpanCutoff     = input.getReal("globExpanCutoff",1e-8);
     auto globExpanKrylovDim  = input.getInt("globExpanKrylovDim",3);
@@ -156,6 +161,8 @@ int main(int argc, char* argv[])
 
     auto sweeps        = Read_sweeps (infile, "sweeps");
 
+    auto basis = input.getString("scatter_basis");
+
     cout << setprecision(14) << endl;
 
     MPS psi;
@@ -170,7 +177,7 @@ int main(int argc, char* argv[])
     if (!read)
     {
         // Factor for exponential-decay hopping
-        Real damp_fac = exp(-1./damp_decay_length);
+        Real damp_fac = (damp_decay_length == 0 ? 1. : exp(-1./damp_decay_length));
         // Single-particle Hamiltonians
         cout << "H left lead" << endl;
         Basis leadL = OneParticleBasis ("L", L_lead, t_lead, mu_leadL, damp_fac, true, true);
@@ -186,9 +193,24 @@ int main(int argc, char* argv[])
         glob_basis.add_partition ("R",leadR);
         glob_basis.add_partition ("S",system);
         glob_basis.add_partition ("C",charge);
+        auto basis_info = vector<BasisInfo> ();
+        if (basis == "SC")
+        {
+            basis_info = sort_by_energy_charging (glob_basis.parts().at("C"), {glob_basis.parts().at("L"), glob_basis.parts().at("R"), glob_basis.parts().at("S")});
+        }
+        else if (basis == "real_space")
+        {
+            basis_info = sort_by_energy_S_middle_charging (glob_basis.parts().at("S"), glob_basis.parts().at("C"), {glob_basis.parts().at("L"), glob_basis.parts().at("R")});
+        }
+        else
+        {
+            cout << "Unknown basis: " << basis << endl;
+            throw;
+        }
         //glob_basis.sort_basis (sort_by_energy_S_middle (system.part("S"), {system.part("L"), system.part("R")}));
-        glob_basis.sort_basis (sort_by_energy_S_middle_charging (glob_basis.parts().at("S"), glob_basis.parts().at("C"),
-                               {glob_basis.parts().at("L"), glob_basis.parts().at("R")}));
+        //glob_basis.sort_basis (sort_by_energy_S_middle_charging (glob_basis.parts().at("S"), glob_basis.parts().at("C"),
+        //                       {glob_basis.parts().at("L"), glob_basis.parts().at("R")}));
+        glob_basis.sort_basis (basis_info);
         glob_basis.print_orbs();
         cout << "device site = " << glob_basis.idevL() << " " << glob_basis.idevR() << endl;
 
@@ -227,9 +249,20 @@ int main(int argc, char* argv[])
         // Initialze MPS
         if (Delta != 0.)
         {
-            auto DMRG_sweeps = Read_sweeps (infile, "DMRG_sweeps");
-            //psi = get_ground_state_SC (glob_basis, sites, mu_biasL, mu_biasS, mu_biasR, para, DMRG_sweeps, args_basis);
-            psi = get_ground_state_BdG_scatter (glob_basis, sites, mu_biasL, mu_biasS, mu_biasR, para, maxCharge);
+            if (basis == "SC")
+            {
+                psi = get_ground_state_BdG_scatter (glob_basis, sites, mu_biasL, mu_biasS, mu_biasR, para, maxCharge);
+            }
+            else if (basis == "real_space")
+            {
+                auto DMRG_sweeps = Read_sweeps (infile, "DMRG_sweeps");
+                psi = get_ground_state_SC (glob_basis, sites, mu_biasL, mu_biasS, mu_biasR, para, DMRG_sweeps, args_basis);
+            }
+            else
+            {
+                cout << "Unknown basis: " << basis << endl;
+                throw;
+            }
         }
         else
             psi = get_non_inter_ground_state (glob_basis, sites, mu_biasL, mu_biasS, mu_biasR);
@@ -237,7 +270,6 @@ int main(int argc, char* argv[])
 
         // Check initial energy
         cout << "Initial energy = " << inner (psi,H,psi) << endl;
-
     }
     else
     {
@@ -251,8 +283,6 @@ int main(int argc, char* argv[])
     int lenL = visit (basis::size(), glob_basis.parts().at("L"));
     int lenS = visit (basis::size(), glob_basis.parts().at("S"));
     vector<int> spec_links = {lenL-1, lenL+lenS+1};
-    /*for(int i = 1; i < glob_basis.N_phys(); i++)
-        spec_links.push_back (i);*/
     int N = glob_basis.N();
     vector<MPO> JMPOs (N);
     for(int i : spec_links)

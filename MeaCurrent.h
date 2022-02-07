@@ -7,19 +7,31 @@
 using namespace vectool;
 
 template <typename SiteType>
-MPO get_current_mpo (const SiteType& sites, const WireSystem& sys, int i, Real cutoff=1e-18)
+MPO get_current_mpo (const SiteType& sites, const WireSystem& sys, int i, Real cutoff=1e-16)
 {
     auto [partL, i1] = get_loc (sys, i);
     auto [partR, i2] = get_loc (sys, i+1);
     AutoMPO ampo (sites);
     add_CdagC (ampo, sys, partL, partR, i1, i2, 1.);
-//cout << "cur " << partL << " " << partR << " " << i1 << " " << i2 << endl;
     auto mpo = toMPO (ampo);
     return mpo;
 }
 
 template <typename SiteType>
-MPO get_current_N_mpo (const SiteType& sites, const WireSystem& sys, int i, Real cutoff=1e-18)
+MPO get_current_mpo (const SiteType& sites, const WireSystem& sys, const string& p1, int i1, const string& p2, int i2, Real cutoff=1e-16)
+{
+    const auto& chain1 = sys.parts().at(p1);
+    const auto& chain2 = sys.parts().at(p2);
+    if (i1 < 0) i1 += visit (basis::size(), chain1) + 1;
+    if (i2 < 0) i2 += visit (basis::size(), chain2) + 1;
+    AutoMPO ampo (sites);
+    add_CdagC (ampo, sys, p1, p2, i1, i2, 1.);
+    auto mpo = toMPO (ampo);
+    return mpo;
+}
+
+template <typename SiteType>
+MPO get_current_N_mpo (const SiteType& sites, const WireSystem& sys, int i, Real cutoff=1e-16)
 {
     auto [partL, i1] = get_loc (sys, i);
     auto [partR, i2] = get_loc (sys, i+1);

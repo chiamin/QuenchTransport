@@ -19,7 +19,7 @@ using namespace std;
 // Return: vector of (coef, k1, dag'1, k2, dag'2)
 template <typename Basis1, typename Basis2>
 vector <tuple <auto,int,bool,int,bool>>
-quadratic_operator (const Basis1& basis1, const Basis2& basis2, int i1, int i2, bool dag1, bool dag2, Real cutoff=1e-18)
+quadratic_operator (const Basis1& basis1, const Basis2& basis2, int i1, int i2, bool dag1, bool dag2, Real cutoff=1e-16)
 {
     auto C1 = visit (basis::C_op(i1, dag1), basis1),     // i -> k, coef, dag
          C2 = visit (basis::C_op(i2, dag2), basis2);
@@ -183,12 +183,10 @@ void add_CdagC (AutoMPO& ampo, const WireSystem& sys, const string& p1, const st
         if (op_charge != "")
         {
             ampo += c, op1, j1, op_charge, jc, op2, j2;
-//cout << "! " << c << " " << op1 << " " << j1 << " " << op_charge << " " << jc << " " << op2 << " " << j2 << endl;
         }
         else
         {
             ampo += c, op1, j1, op2, j2;
-//cout << "@ " << c << " " << op1 << " " << j1 << " " << op2 << " " << j2 << endl;
         }
     }
 }
@@ -236,7 +234,6 @@ AutoMPO get_ampo (const WireSystem& sys, const SiteType& sites, const Para& para
                 auto mu = visit (basis::mu(i), chain);
                 ampo += -0.5 * (en + mu), "I", i;
             }
-cout << "* " << p << " " << i << " " << en << endl;
         }
     }
     // Contact hopping

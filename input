@@ -1,7 +1,7 @@
 basic
 {
-    L_lead = 10
-    L_device = 7
+    L_lead = 20
+    L_device = 4
     t_lead = 1
     t_device = 0.5
     t_contactL = 0.2
@@ -18,15 +18,17 @@ basic
 
     SC_scatter = yes
 
+    scatter_basis = SC
+
     mu_biasL = 0.025
     mu_biasS = 0
     mu_biasR = -0.025
     dt = 1
-    time_steps = 200
+    time_steps = 40
 
-    NumCenter = 1
+    NumCenter = 2
     mixNumCenter = no
-    globExpanN = 10000
+    globExpanN = 10
     globExpanItv = 1
     globExpanCutoff = 1e-4
     globExpanKrylovDim = 2

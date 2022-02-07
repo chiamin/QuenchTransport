@@ -42,10 +42,11 @@ sort_by_energy_S_middle
     return orbs;
 }
 
+// chainS at the middle; chainC at the left of chainS
 template <typename SysBasis, typename LeadBasis, typename ChargeBasis>
 vector<BasisInfo>
 sort_by_energy_S_middle_charging
-(const SysBasis& chainS, const LeadBasis& chainC, std::initializer_list<ChargeBasis> other_chains)
+(const SysBasis& chainS, const ChargeBasis& chainC, std::initializer_list<LeadBasis> other_chains)
 {
     auto orb_C = sort_by_energy ({chainC});
     auto orbs = sort_by_energy_S_middle (chainS, other_chains);
@@ -54,6 +55,24 @@ sort_by_energy_S_middle_charging
     {
         auto [seg,i,en] = *it;
         if (seg == "S") break;
+    }
+    orbs.insert (it, orb_C.begin(), orb_C.end());
+    return orbs;
+}
+
+// Put the charging site at zero energy
+template <typename Basis>
+vector<BasisInfo>
+sort_by_energy_charging
+(const Basis& chainC, std::initializer_list<Basis> other_chains)
+{
+    auto orb_C = sort_by_energy ({chainC});
+    auto orbs = sort_by_energy (other_chains);
+    auto it = orbs.begin();
+    for(; it != orbs.end(); it++)
+    {
+        auto [seg,i,en] = *it;
+        if (en > 0.) break;
     }
     orbs.insert (it, orb_C.begin(), orb_C.end());
     return orbs;

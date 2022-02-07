@@ -69,7 +69,6 @@ MPS get_ground_state_BdG_scatter (const WireSystem& sys, const SiteType& sites, 
             throw;
         }
     }
-    sys.print_orbs();
 
     // Superconducting gap
     Real SC_gap = visit (basis::en(1), sys.parts().at("S"));

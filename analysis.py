@@ -170,6 +170,7 @@ if __name__ == '__main__':
         dt = get_para (fname, 'dt', float)
         m = get_para (fname, 'Largest link dim', int)
         Nstep, L = np.shape(Is)
+        ts = dt * np.arange(1,Nstep+1)
 
         # I profile
         '''f,ax = pl.subplots()
@@ -204,7 +205,7 @@ if __name__ == '__main__':
         ax.legend()
         ps.set(ax)
 
-        f,ax = pl.subplots()
+        '''f,ax = pl.subplots()
         sites = np.array(range(1,L+2))
         ii = segs == 'L'
         plot_time_slice (ax, ns[:,ii], n=5, marker='.', ls='None', label='L', xs=sites[ii])
@@ -218,7 +219,7 @@ if __name__ == '__main__':
         ax.set_xlabel ('site')
         ax.set_ylabel ('occupasion')
         ax.legend()
-        ps.set(ax)
+        ps.set(ax)'''
 
         # S profile
         '''f5,ax5 = pl.subplots()
@@ -232,13 +233,21 @@ if __name__ == '__main__':
         ax6.set_ylabel ('entropy')
         ps.set(ax6)'''
 
+        # Bond dimension vs. MPS bond
         f,ax = pl.subplots()
         plot_time_slice (ax, dims, n=5)
-        ax.set_xlabel ('site')
-        ax.set_ylabel ('bond dimension')
+        ax.set_xlabel ('MPS bond')
+        ax.set_ylabel ('Bond dimension')
         ps.set(ax)
 
-        ts = dt * np.arange(1,Nstep+1)
+        # Bond dimension vs. time
+        max_dims = np.amax (dims, axis=1)
+        f,ax = pl.subplots()
+        ax.plot (ts, max_dims, marker='.')
+        ax.set_xlabel ('Time')
+        ax.set_ylabel ('Bond dimension')
+        ps.set(ax)
+
         idevL, idevR = get_para (fname, 'device site', int, n=2)
         idevR -= 1  # For the charge site
         print (idevL, idevR)
@@ -248,6 +257,7 @@ if __name__ == '__main__':
         ax3.plot (ts, N_dev, marker='.')
         ps.set(ax3)'''
 
+        # Charge site occupasion
         f,ax = pl.subplots()
         maxnC = get_para (fname, 'maxCharge', int)
         cs = range(-maxnC,maxnC+1)

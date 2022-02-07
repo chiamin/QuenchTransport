@@ -187,9 +187,6 @@ Matrix symmetrice_zero_energy_modes (const Vector& ens, Matrix U)
     phi1 /= norm(phi1);
     auto phi2 = particle_hole_transform (phi1);
 
-cout << "ggg " << phi1*phi1 << " " << norm(phi1) << endl;
-cout << phi1 << endl;
-
     // Update the zero-energy states in U
     column (U,is.at(0)) &= phi1;
     column (U,is.at(1)) &= phi2;
@@ -215,13 +212,7 @@ BdGBasis :: BdGBasis (const string& name, int L, Real t, Real mu, Real Delta)
     // The energy for q=0,...N-1 is positive
     //                q=N,...2N-1 is negative
 
-cout << "EE\n" << ens << endl;
-cout << "UU" << endl;
-cout << U << endl;
-
-
-U = symmetrice_zero_energy_modes (ens, U);
-cout << "U\n" << U << endl;
+    U = symmetrice_zero_energy_modes (ens, U);
 
     auto tmp = U(0,0);
     if constexpr (!is_same_v <decltype(tmp), Real>)
@@ -262,21 +253,13 @@ cout << "U\n" << U << endl;
     subMatrix(Uc,0,N,N,2*N)   &= conj (_v);
     subMatrix(Uc,N,2*N,N,2*N) &= conj (_u);
 
-cout << "Uc" << endl;
-cout << Uc << endl;
-//exit(0);
-
     auto Hd = transpose(Uc) * _H * Uc;
-cout << "Hd\n" << Hd << endl;
-
     for(int i = 0; i < N; i++)
     {
         Hd(i,i) -= 0.5*_ens(i);
         Hd(i+N,i+N) += 0.5*_ens(i);
     }
-cout << "Hd\n" << Hd << endl;
     mycheck (abs(norm(Hd)) < 1e-14, "Construct unitray matrix failed");
-//exit(0);
 }
 
 // i is the site index in real space

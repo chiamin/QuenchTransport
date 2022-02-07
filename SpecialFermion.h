@@ -22,7 +22,6 @@ class SpecialFermionSite
           ts.addTags("n="+str(n));
         }
         auto in_scatter = args.getBool("in_scatter");
-cout << "CCC " << systype << endl;
         if (systype == "SC_scatter")
         {
             if (in_scatter)
