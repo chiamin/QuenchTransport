@@ -121,7 +121,7 @@ Vector particle_hole_transform (const Vector& v)
 // However for zero-energy (Majorana) modes, since |phi_i> and S|phi_i> are degenerate,
 // numerically we will get in geenral arbitrary superpositions of them,
 // so one needs to symmetrice them explicitly.
-Matrix symmetrice_zero_energy_modes (const Vector& ens, Matrix U)
+Matrix symmetrice_zero_energy_modes (const Vector& ens, Matrix U, Real zero_crit=1e-8)
 {
     mycheck (ens.size() == nrows(U), "Size not match");
     int N = ens.size()/2;
@@ -131,7 +131,7 @@ Matrix symmetrice_zero_energy_modes (const Vector& ens, Matrix U)
     vector<Vector> states;
     for(int i = 0; i < 2*N; i++)
     {
-        if (abs(ens(i)) < 1e-14)
+        if (abs(ens(i)) < zero_crit)
         {
             is.push_back (i);
             states.emplace_back (column (U, i));
@@ -170,8 +170,6 @@ Matrix symmetrice_zero_energy_modes (const Vector& ens, Matrix U)
         swap (e_pos, e_neg);
         swap (w_pos, w_neg);
     }
-    cout << "sss " << eigvals << endl;
-    cout << W << endl;
     Vector v_pos (2*N),
            v_neg (2*N);
     for(int i = 0; i < N0; i++)
@@ -238,8 +236,6 @@ BdGBasis :: BdGBasis (const string& name, int L, Real t, Real mu, Real Delta)
         mycheck (orthogonal_to_particle_hole_transform (phi), "Not orthogonal to its particle-hole transformed state");
 
         _ens(j) = 2.*ens(i);
-        //subMatrix (_u,0,N,j,j+1) &= subMatrix(U,0,N,i,i+1);
-        //subMatrix (_v,0,N,j,j+1) &= subMatrix(U,N,2*N,i,i+1);
         column (_u,j) &= subVector (phi,0,N);
         column (_v,j) &= subVector (phi,N,2*N);
         j++;

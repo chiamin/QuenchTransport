@@ -2,7 +2,6 @@
 #define __CORR_H_CMC__
 #include "itensor/all.h"
 #include "IUtility.h"
-using namespace iutility;
 
 template <typename SiteType, typename NumType>
 Mat<NumType> exact_corr (const MPS& psi)
@@ -161,13 +160,13 @@ Vec<NumType> Cdag_Set<SiteType,NumType> :: apply_C (const MPS& psi, int j, strin
         int im = i-1;
         V *= _Us.at(im);
         const Index& ii = V.inds()(1);
-        cdagc(i) = eltT<NumType> (V, ii=dim(ii));
+        cdagc(i) = iut::eltT<NumType> (V, ii=dim(ii));
 
         V *= dag(_Proj.at(im)); // Project to left space (the column of U)
     }
 
     Index si = V.inds()(1);
-    cdagc(0) = eltT<NumType> (V, si=1);
+    cdagc(0) = iut::eltT<NumType> (V, si=1);
 
     return cdagc;
 }
@@ -192,7 +191,7 @@ Mat<NumType> Measure_corr (MPS psi, Args const& args=Args::global(), string spin
         // Diagonal
         ITensor tmp = multSite (sp.op("N"+spin_str,j), psi(j));
         ITensor ci = tmp * dag(psi(j));
-        corr(jc,jc) = eltT<NumType> (ci);
+        corr(jc,jc) = iut::eltT<NumType> (ci);
 
         if (j == i1) continue;
         else if (j == i1+1)

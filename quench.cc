@@ -19,7 +19,6 @@ Timers timer;
 using namespace vectool;
 using namespace itensor;
 using namespace std;
-using namespace iutility;
 
 struct Para
 {
@@ -159,7 +158,7 @@ int main(int argc, char* argv[])
     auto read_dir      = input.getString("read_dir",".");
     auto read_file     = input.getString("read_file","");
 
-    auto sweeps        = Read_sweeps (infile, "sweeps");
+    auto sweeps        = iut::Read_sweeps (infile, "sweeps");
 
     auto basis = input.getString("scatter_basis");
 
@@ -255,7 +254,7 @@ int main(int argc, char* argv[])
             }
             else if (basis == "real_space")
             {
-                auto DMRG_sweeps = Read_sweeps (infile, "DMRG_sweeps");
+                auto DMRG_sweeps = iut::Read_sweeps (infile, "DMRG_sweeps");
                 psi = get_ground_state_SC (glob_basis, sites, mu_biasL, mu_biasS, mu_biasR, para, DMRG_sweeps, args_basis);
             }
             else
