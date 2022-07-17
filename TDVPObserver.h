@@ -5,7 +5,7 @@
 #include "itensor/all.h"
 #include "Entanglement.h"
 #include "ContainerUtility.h"
-using namespace vectool;
+using namespace iut;
 using namespace iutility;
 
 template <typename SitesType>

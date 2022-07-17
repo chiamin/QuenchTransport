@@ -61,13 +61,13 @@ def get_data (fname):
     L_device = get_para (fname, 'L_device', int)
     L = 2*L_lead + L_device
     Nstep = get_para (fname, 'step =', int, last=True)
-    idevL, idevR = get_para (fname, 'device site', int, n=2)
     iC = get_para (fname, 'charge site', int)
     hopt = get_hop_t (fname)
     maxnC = get_para (fname, 'maxCharge', int)
+    t_lead = get_para (fname, 't_lead', float)
 
-    Is = np.full ((Nstep,L), np.nan)
-    Is_spec = np.full ((Nstep,L-1), np.nan)
+    jLs = np.full (Nstep, np.nan)
+    jRs = np.full (Nstep, np.nan)
     ns = np.full ((Nstep,L+1), np.nan)
     Ss = np.full ((Nstep,L+1), np.nan)
     dims = np.full ((Nstep,L), np.nan)
@@ -78,15 +78,12 @@ def get_data (fname):
             if line.startswith ('step ='):
                 tmp = line.split()
                 step = int(tmp[-1])
-            elif line.startswith('*I'):
+            elif line.startswith('I L/R ='):
                 tmp = line.split()
-                ilink = int(tmp[-3])
-
-                #I = float(tmp[-1].strip('()').split(',')[0])
-                I = float(tmp[-1])
-                cc = 2*pi * hopt[ilink]
-                Is_spec[step-1,ilink-1] = I * cc
-                #Is[step-1,ilink-1] = I * cc
+                jL = float(tmp[-2]) * 2*pi * t_lead
+                jR = float(tmp[-1]) * 2*pi * t_lead
+                jLs[step-1] = jL
+                jRs[step-1] = jR
             elif line.startswith('*den '):
                 tmp = line.split()
                 i = int(tmp[1])
@@ -107,13 +104,13 @@ def get_data (fname):
                 n = int(tmp[-2])
                 nC = float(tmp[-1])
                 nCs[step-1,n+maxnC] = nC
-    # Is: current, currently not used
-    # Is_spec: current on the special links
+    # jLs: current for the link that is left to the scatterer
+    # jRs: current for the link that is right to the scatterer
     # ns: occupasion
     # Ss: entanglement entropy
     # dims: bond dimension
     # nCs: distribution on the charge site
-    return Is, Is_spec, ns, Ss, dims, nCs
+    return Nstep, L, jLs, jRs, ns, Ss, dims, nCs
 
 def plot_prof (ax, data, dt, label=''):
     Nstep, L = np.shape(data)
@@ -126,7 +123,7 @@ def plot_prof (ax, data, dt, label=''):
 def plot_time_slice (ax, data, n, xs=[], label='', **args):
     Nstep, L = np.shape(data)
     itv = Nstep // n
-    if xs == []:
+    if len(xs) == 0:
         xs = range(1,L+1)
     for d in data[::itv,:]:
         ax.plot (xs, d, **args)
@@ -136,10 +133,10 @@ def get_basis (fname):
     ens, segs = [],[]
     with open(fname) as f:
         for line in f:
-            if 'orbitals, segment, ki, energy' in line:
+            if 'Orbitals: name, ki, energy' in line:
                 for line in f:
                     tmp = line.split()
-                    if not tmp[0].isdigit():
+                    if not tmp[0][:-1].isdigit():
                         return np.array(ens), np.array(segs)
                     ens.append (float(tmp[3]))
                     segs.append (tmp[1])
@@ -159,34 +156,22 @@ def extrap_current (ts, Il, Ir, plot=False):
 
 if __name__ == '__main__':
     files = [i for i in sys.argv[1:] if i[0] != '-']
-    fi,axi = pl.subplots()
     for fname in files:
         print (fname)
 
         en_basis, segs = get_basis (fname)
 
         # Get data
-        Is, Is_spec, ns, Ss, dims, nCs = get_data (fname)
+        Nstep, L, jLs, jRs, ns, Ss, dims, nCs = get_data (fname)
         dt = get_para (fname, 'dt', float)
         m = get_para (fname, 'Largest link dim', int)
-        Nstep, L = np.shape(Is)
         ts = dt * np.arange(1,Nstep+1)
 
-        # I profile
-        '''f,ax = pl.subplots()
-        plot_prof (ax, Is_spec, dt, 'current')
-        ax.set_title ('$m='+str(m)+'$')
-        ps.set(ax)
-
-        f8,ax8 = pl.subplots()
-        plot_time_slice (ax8, Is, n=3)
-        ps.set(ax8)'''
-
         # n profile
-        '''f2,ax2 = pl.subplots()
+        f2,ax2 = pl.subplots()
         plot_prof (ax2, ns, dt, 'density')
         ax2.set_title ('$m='+str(m)+'$')
-        ps.set(ax2)'''
+        ps.set(ax2)
 
         f,ax = pl.subplots()
         ii = segs == 'L'
@@ -199,13 +184,12 @@ if __name__ == '__main__':
             ax.axvline (en_basis[x], ls='--', c='gray', alpha=0.5)
         ii = segs == 'C'
         plot_time_slice (ax, ns[:,ii], n=5, marker='*', ls='None', label='C', xs=en_basis[ii])
-        #ax.plot (range(1,len(en_basis)+1), en_basis)
         ax.set_xlabel ('energy')
         ax.set_ylabel ('occupasion')
         ax.legend()
         ps.set(ax)
 
-        '''f,ax = pl.subplots()
+        f,ax = pl.subplots()
         sites = np.array(range(1,L+2))
         ii = segs == 'L'
         plot_time_slice (ax, ns[:,ii], n=5, marker='.', ls='None', label='L', xs=sites[ii])
@@ -215,14 +199,13 @@ if __name__ == '__main__':
         plot_time_slice (ax, ns[:,ii], n=5, marker='+', ls='None', label='S', xs=sites[ii])
         ii = segs == 'C'
         plot_time_slice (ax, ns[:,ii], n=5, marker='*', ls='None', label='C', xs=sites[ii])
-        #ax.plot (range(1,len(en_basis)+1), en_basis)
         ax.set_xlabel ('site')
         ax.set_ylabel ('occupasion')
         ax.legend()
-        ps.set(ax)'''
+        ps.set(ax)
 
         # S profile
-        '''f5,ax5 = pl.subplots()
+        f5,ax5 = pl.subplots()
         plot_prof (ax5, Ss, dt, 'entropy')
         ax5.set_title ('$m='+str(m)+'$')
         ps.set(ax5)
@@ -231,7 +214,7 @@ if __name__ == '__main__':
         plot_time_slice (ax6, Ss, n=3)
         ax6.set_xlabel ('site')
         ax6.set_ylabel ('entropy')
-        ps.set(ax6)'''
+        ps.set(ax6)
 
         # Bond dimension vs. MPS bond
         f,ax = pl.subplots()
@@ -248,58 +231,29 @@ if __name__ == '__main__':
         ax.set_ylabel ('Bond dimension')
         ps.set(ax)
 
-        idevL, idevR = get_para (fname, 'device site', int, n=2)
-        idevR -= 1  # For the charge site
-        print (idevL, idevR)
-        #
-        '''N_dev = np.sum (ns[:, idevL-1:idevR], axis=1)
-        f3,ax3 = pl.subplots()
-        ax3.plot (ts, N_dev, marker='.')
-        ps.set(ax3)'''
-
         # Charge site occupasion
         f,ax = pl.subplots()
         maxnC = get_para (fname, 'maxCharge', int)
         cs = range(-maxnC,maxnC+1)
         for i in range(len(cs)):
             ax.plot (ts, nCs[:,i], label='n='+str(cs[i]));
-        #plot_time_slice (ax, nCs, n=5, xs=range(-maxnC,maxnC+1), marker='.', ls='None')
-        #ax.set_xlabel ('$n_C$')
         ax.set_xlabel ('time')
         ax.set_ylabel ('occupassion')
-        #ps.set_tick_inteval (ax.xaxis, 1)
         ax.legend()
         ps.set(ax)
 
         # current vs time
+        fi,axi = pl.subplots()
         muL = get_para (fname, 'mu_biasL', float)
         muR = get_para (fname, 'mu_biasR', float)
         Vb = muR - muL
-        Il = Is_spec[:, idevL-3] / Vb
-        Ir = Is_spec[:, idevR] / Vb
+        Il = jLs / Vb
+        Ir = jRs / Vb
         axi.plot (ts, Il, label='left')
         axi.plot (ts, Ir, label='right')
-        #axi.plot (ts, Is[:, idevL-3] / Vb, marker='.', label='l2')
-        #axi.plot (ts, Is[:, idevL] / Vb, marker='.', label='r2')
-        #extrap_current (ts, Il, Ir, plot=True)
         axi.set_xlabel ('time')
-        axi.set_ylabel ('conductance')
+        axi.set_ylabel ('current')
         axi.legend()
-
-        '''dmrgdir = get_para (fname, 'input_dir', str)
-        dmrgfile = glob.glob (dmrgdir+'/out')[0]
-        tp = get_para (dmrgfile, 't_contactR', float)
-        axi.axhline (-exactG(0, tp), ls='--', c='gray')'''
-
         ps.set(axi)
-
-        if '-pdf' in sys.argv:
-            filename = fname.replace('.out','')+'_I.pdf'
-            fi.savefig (filename)
-        if '-save' in sys.argv:
-            with open(fname.replace('.out','')+'_I.txt','w') as f:
-                print ('t {link}',file=f)
-                for i in range(len(ts)):
-                    print (ts[i],*(Is_spec[i,:]/Vb),file=f)
 
     pl.show()

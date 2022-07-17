@@ -35,7 +35,7 @@ class MixedBasis : public SiteSet
         auto sites = SiteStore(N);
         for(int j = 1; j <= N; ++j)
         {
-            bool in_scatter = vectool::in_vector (scatter_sites, j);
+            bool in_scatter = iut::in_vector (scatter_sites, j);
             if(j == iC) sites.set (j,SpecialBosonSite   ({args,"SiteNumber=",j}));
             else        sites.set (j,SpecialFermionSite ({args,"SiteNumber=",j,"in_scatter",in_scatter}));
         }
